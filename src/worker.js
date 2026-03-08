@@ -340,7 +340,7 @@ const MANAGE_HTML = `<!DOCTYPE html>
 <body>
 
 <header>
-  <h1>Ultrabroken Archives <span class="sub">Media Asset Manager</span></h1>
+  <h1>Ultrabroken Archives <span class="sub">Media Vault</span></h1>
 </header>
 
 <div class="tabs">

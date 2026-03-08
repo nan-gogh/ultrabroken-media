@@ -18,11 +18,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install ffmpeg and wrangler
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg
-          npm install -g wrangler@4
+      # ffmpeg is pre-installed on ubuntu-latest
+
+      - name: Cache npm packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-wrangler-4
+
+      - name: Install wrangler
+        run: npm install -g wrangler@4
 
       - name: Transcode and re-upload
         env:

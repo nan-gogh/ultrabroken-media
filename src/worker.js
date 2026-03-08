@@ -82,6 +82,7 @@ async function handleList(request, env) {
     key: obj.key,
     size: obj.size,
     uploaded: obj.uploaded,
+    transcode: obj.customMetadata?.transcode || null,
   }));
 
   return Response.json({
@@ -118,9 +119,13 @@ async function handleUpload(request, env) {
       continue;
     }
 
-    await env.MEDIA.put(key, value.stream(), {
+    const putOptions = {
       httpMetadata: { contentType: value.type || getMime(key) },
-    });
+    };
+    if (/\.(mp4|mov|mkv)$/i.test(key)) {
+      putOptions.customMetadata = { transcode: 'pending' };
+    }
+    await env.MEDIA.put(key, value.stream(), putOptions);
 
     results.push({ key, size: value.size, ok: true });
   }
@@ -326,6 +331,18 @@ const MANAGE_HTML = `<!DOCTYPE html>
   .file-row .size { color: var(--text-dim); min-width: 72px; text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; }
   .file-row .date { color: var(--text-dim); min-width: 92px; text-align: right; font-size: 0.75rem; }
   .file-row .actions { display: flex; gap: 6px; }
+  .badge-transcode {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 0.68rem; font-family: 'JetBrains Mono', monospace;
+    background: rgba(255, 170, 50, 0.15); color: #ffaa32;
+    border: 1px solid rgba(255, 170, 50, 0.3);
+    animation: pulse-badge 2s ease-in-out infinite;
+    white-space: nowrap;
+  }
+  @keyframes pulse-badge {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
 
   button.btn {
     padding: 4px 11px; border-radius: 4px; border: 1px solid var(--border);
@@ -448,8 +465,11 @@ async function loadFiles() {
       const name = f.key.slice(currentPrefix.length);
       const size = formatSize(f.size);
       const date = new Date(f.uploaded).toLocaleDateString();
+      const badge = f.transcode === 'pending'
+        ? '<span class="badge-transcode">\u23F3 transcoding</span>'
+        : '';
       html += '<div class="file-row">'
-        + '<span class="name">' + escHtml(name) + '</span>'
+        + '<span class="name">' + escHtml(name) + ' ' + badge + '</span>'
         + '<span class="size">' + size + '</span>'
         + '<span class="date">' + date + '</span>'
         + '<span class="actions">'
@@ -622,6 +642,29 @@ async function purgePrefix() {
     showStatus('Purge failed: ' + e.message, false);
   }
 }
+
+// ── Auto-refresh for pending transcodes ──
+let refreshTimer = null;
+function scheduleRefresh() {
+  if (refreshTimer) return;
+  refreshTimer = setInterval(async () => {
+    const container = document.getElementById('fileListContainer');
+    const scrollY = container.scrollTop;
+    await loadFiles();
+    container.scrollTop = scrollY;
+    if (!document.querySelector('.badge-transcode')) {
+      clearInterval(refreshTimer);
+      refreshTimer = null;
+    }
+  }, 30000);
+}
+
+// patch loadFiles to trigger auto-refresh
+const _origLoadFiles = loadFiles;
+loadFiles = async function() {
+  await _origLoadFiles();
+  if (document.querySelector('.badge-transcode')) scheduleRefresh();
+};
 
 // ── Init ──
 loadFiles();

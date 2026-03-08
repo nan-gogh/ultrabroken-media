@@ -407,7 +407,7 @@ const MANAGE_HTML = `<!DOCTYPE html>
 
 <div class="upload-zone" id="dropzone">
   <p><strong>Drop files here</strong> or click to browse</p>
-  <p style="margin-top:6px;font-size:0.78rem;">Images auto-convert to AVIF &mdash; Videos auto-transcode to AV1+Opus</p>
+  <p style="margin-top:6px;font-size:0.78rem;">Images auto-convert to AVIF/WebP &mdash; Videos auto-transcode to AV1+Opus</p>
   <p style="margin-top:3px;font-size:0.72rem;color:var(--text-dim);">Max 50 MB per file</p>
   <div class="progress-bar" id="convertProgress"><div class="fill" id="convertFill"></div></div>
   <div class="convert-info" id="convertInfo"></div>
@@ -529,11 +529,11 @@ async function uploadFiles(files) {
       convertInfo.textContent = "Converting " + f.name + " to AVIF...";
       progressFill.style.width = ((converted / total) * 100) + "%";
       try {
-        const avifBlob = await convertToAvif(f);
-        const avifName = f.name.replace(/\\.[^.]+$/, ".avif");
-        const savings = ((1 - avifBlob.size / f.size) * 100).toFixed(0);
-        convertInfo.textContent = f.name + " → " + avifName + " (" + formatSize(avifBlob.size) + ", -" + savings + "%)"; 
-        form.append("file", new File([avifBlob], avifName, { type: "image/avif" }));
+        const result = await convertToAvif(f);
+        const newName = f.name.replace(/\\.[^.]+$/, "." + result.ext);
+        const savings = ((1 - result.blob.size / f.size) * 100).toFixed(0);
+        convertInfo.textContent = f.name + " \u2192 " + newName + " (" + formatSize(result.blob.size) + ", -" + savings + "%)"; 
+        form.append("file", new File([result.blob], newName, { type: result.mime }));
       } catch (e) {
         convertInfo.textContent = "AVIF conversion failed for " + f.name + ", uploading original";
         form.append("file", f);
@@ -573,7 +573,6 @@ async function convertToAvif(file) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
-      // Scale down if larger than 1920x1080
       let w = img.naturalWidth, h = img.naturalHeight;
       if (w > 1920 || h > 1080) {
         const scale = Math.min(1920 / w, 1080 / h);
@@ -585,8 +584,20 @@ async function convertToAvif(file) {
       canvas.height = h;
       const ctx = canvas.getContext("2d");
       ctx.drawImage(img, 0, 0, w, h);
+      // Try AVIF first, fall back to WebP
       canvas.toBlob(
-        blob => blob ? resolve(blob) : reject(new Error("toBlob returned null")),
+        blob => {
+          if (blob && blob.type === "image/avif") {
+            resolve({ blob, ext: "avif", mime: "image/avif" });
+          } else {
+            canvas.toBlob(
+              wb => wb ? resolve({ blob: wb, ext: "webp", mime: "image/webp" })
+                       : reject(new Error("toBlob returned null")),
+              "image/webp",
+              0.82
+            );
+          }
+        },
         "image/avif",
         0.7
       );

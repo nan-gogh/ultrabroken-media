@@ -48,6 +48,10 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Exclude runner-generated artifacts from the commit
+          printf 'node_modules/\n_site/\n' >> .gitignore
+
           git checkout --orphan _fresh
           git add -A
           git commit -m "chore: reset history — assets live on Cloudflare Pages"

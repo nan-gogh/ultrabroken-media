@@ -133,45 +133,49 @@ async function handleUpload(request, env) {
     results.push({ key, size: value.size, ok: true });
   }
 
-  // If any video was uploaded, trigger the transcode workflow
+  // Dispatch optimization/transcode workflows
+  const dispatches = [];
   const videoUploaded = results.some(r => r.ok && /\.(mp4|mov|webm|mkv)$/i.test(r.key));
   if (videoUploaded && env.GITHUB_TOKEN) {
     const videoKeys = results.filter(r => r.ok && /\.(mp4|mov|webm|mkv)$/i.test(r.key)).map(r => r.key);
     try {
-      await fetch('https://api.github.com/repos/' + (env.GITHUB_REPO || 'nan-gogh/ultrabroken-media') + '/actions/workflows/transcode.yml/dispatches', {
+      const resp = await fetch('https://api.github.com/repos/' + (env.GITHUB_REPO || 'nan-gogh/ultrabroken-media') + '/actions/workflows/transcode.yml/dispatches', {
         method: 'POST',
         headers: {
           'Authorization': 'token ' + env.GITHUB_TOKEN,
           'Accept': 'application/vnd.github.v3+json',
           'Content-Type': 'application/json',
+          'User-Agent': 'ultrabroken-media-worker',
         },
         body: JSON.stringify({ ref: 'main', inputs: { keys: videoKeys.join(',') } }),
       });
+      dispatches.push({ workflow: 'transcode', status: resp.status, ok: resp.status === 204 });
     } catch (e) {
-      // Non-fatal â€” video uploads still succeed, transcode just won't run
+      dispatches.push({ workflow: 'transcode', error: e.message });
     }
   }
 
-  // If any image was uploaded, trigger the optimize workflow
   const imageUploaded = results.some(r => r.ok && /\.(png|jpe?g|webp|bmp|tiff?)$/i.test(r.key));
   if (imageUploaded && env.GITHUB_TOKEN) {
     const imageKeys = results.filter(r => r.ok && /\.(png|jpe?g|webp|bmp|tiff?)$/i.test(r.key)).map(r => r.key);
     try {
-      await fetch('https://api.github.com/repos/' + (env.GITHUB_REPO || 'nan-gogh/ultrabroken-media') + '/actions/workflows/optimize.yml/dispatches', {
+      const resp = await fetch('https://api.github.com/repos/' + (env.GITHUB_REPO || 'nan-gogh/ultrabroken-media') + '/actions/workflows/optimize.yml/dispatches', {
         method: 'POST',
         headers: {
           'Authorization': 'token ' + env.GITHUB_TOKEN,
           'Accept': 'application/vnd.github.v3+json',
           'Content-Type': 'application/json',
+          'User-Agent': 'ultrabroken-media-worker',
         },
         body: JSON.stringify({ ref: 'main', inputs: { keys: imageKeys.join(',') } }),
       });
+      dispatches.push({ workflow: 'optimize', status: resp.status, ok: resp.status === 204 });
     } catch (e) {
-      // Non-fatal
+      dispatches.push({ workflow: 'optimize', error: e.message });
     }
   }
 
-  return Response.json({ results });
+  return Response.json({ results, dispatches });
 }
 
 async function handleDelete(request, env) {

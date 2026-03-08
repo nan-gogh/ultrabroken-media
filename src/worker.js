@@ -360,6 +360,7 @@ const MANAGE_HTML = `<!DOCTYPE html>
     font-size: 0.84rem; font-family: 'JetBrains Mono', monospace;
     border-left: 3px solid;
   }
+  .status:empty { display: none; }
   .status.ok  { background: rgba(0,240,194,0.07); color: var(--success); border-color: var(--accent); }
   .status.err { background: rgba(248,81,73,0.08); color: var(--danger);  border-color: var(--danger); }
 
@@ -435,7 +436,7 @@ function showStatus(msg, ok) {
   const el = document.getElementById("status");
   el.className = "status " + (ok ? "ok" : "err");
   el.textContent = msg;
-  setTimeout(() => el.textContent = "", 5000);
+  setTimeout(() => { el.textContent = ""; el.className = "status"; }, 5000);
 }
 
 // ── Load file list ──

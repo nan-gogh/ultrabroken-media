@@ -190,79 +190,136 @@ const MANAGE_HTML = `<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ultrabroken Media — Manage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=New+Rocker&family=Texturina:ital,opsz,wght@0,12..44,100..900;1,12..44,100..900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0d1117; --surface: #161b22; --border: #30363d;
-    --text: #e6edf3; --text-dim: #8b949e; --accent: #58a6ff;
-    --danger: #f85149; --success: #3fb950;
+    --bg:        #0f1117;
+    --surface:   #1a1f2e;
+    --surface2:  #222736;
+    --border:    rgba(255,255,255,0.1);
+    --text:      #e0e4ee;
+    --text-dim:  #8b8fa8;
+    --accent:    #00f0c2;
+    --accent-dk: #00796b;
+    --danger:    #f85149;
+    --success:   #00f0c2;
+    --glow:      0 0 12px rgba(0,240,194,0.25);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-family: 'Texturina', Georgia, serif;
     background: var(--bg); color: var(--text);
-    max-width: 960px; margin: 0 auto; padding: 24px 16px;
+    max-width: 980px; margin: 0 auto; padding: 32px 20px;
+    background-image: radial-gradient(ellipse at 50% 0%, rgba(0,121,107,0.12) 0%, transparent 60%);
+    min-height: 100vh;
   }
-  h1 { font-size: 1.4rem; margin-bottom: 20px; }
-  h1 span { color: var(--text-dim); font-weight: normal; font-size: 0.85rem; }
+
+  /* Header */
+  header { margin-bottom: 32px; border-bottom: 1px solid var(--border); padding-bottom: 20px; }
+  h1 {
+    font-family: 'New Rocker', serif;
+    font-size: 2rem; font-weight: normal; letter-spacing: 0.04em;
+    color: var(--accent);
+    text-shadow: var(--glow);
+  }
+  h1 .sub {
+    display: block; font-family: 'Texturina', Georgia, serif;
+    font-size: 0.85rem; color: var(--text-dim); font-weight: normal;
+    letter-spacing: 0.01em; margin-top: 2px;
+  }
 
   /* Tabs */
-  .tabs { display: flex; gap: 2px; margin-bottom: 20px; }
+  .tabs { display: flex; gap: 0; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
   .tabs button {
-    padding: 8px 20px; border: 1px solid var(--border); border-bottom: none;
-    background: var(--surface); color: var(--text-dim); cursor: pointer;
-    border-radius: 6px 6px 0 0; font-size: 0.9rem;
+    padding: 9px 22px;
+    border: 1px solid transparent; border-bottom: none;
+    background: transparent; color: var(--text-dim); cursor: pointer;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.82rem;
+    border-radius: 6px 6px 0 0;
+    transition: color 0.15s, background 0.15s;
+    position: relative; bottom: -1px;
   }
-  .tabs button.active { background: var(--bg); color: var(--text); border-bottom: 1px solid var(--bg); }
+  .tabs button:hover { color: var(--text); }
+  .tabs button.active {
+    background: var(--surface); color: var(--accent);
+    border-color: var(--border); border-bottom-color: var(--surface);
+  }
 
   /* Upload zone */
   .upload-zone {
-    border: 2px dashed var(--border); border-radius: 8px; padding: 40px;
-    text-align: center; cursor: pointer; transition: border-color 0.2s;
-    margin-bottom: 16px;
+    border: 2px dashed var(--border); border-radius: 8px; padding: 44px;
+    text-align: center; cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    margin-bottom: 18px; background: var(--surface);
   }
-  .upload-zone.dragover { border-color: var(--accent); }
-  .upload-zone p { color: var(--text-dim); }
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: var(--accent);
+    box-shadow: var(--glow);
+  }
+  .upload-zone p { color: var(--text-dim); font-size: 0.9rem; }
+  .upload-zone p strong { color: var(--accent); }
 
   /* Prefix selector */
-  .prefix-bar { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; }
-  .prefix-bar label { color: var(--text-dim); font-size: 0.85rem; }
+  .prefix-bar { display: flex; gap: 10px; margin-bottom: 18px; align-items: center; }
+  .prefix-bar label { color: var(--text-dim); font-size: 0.82rem; font-family: 'JetBrains Mono', monospace; }
   .prefix-bar select {
-    background: var(--surface); color: var(--text); border: 1px solid var(--border);
-    padding: 6px 10px; border-radius: 4px; font-size: 0.85rem;
+    background: var(--surface); color: var(--accent); border: 1px solid var(--border);
+    padding: 6px 12px; border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.82rem;
+    cursor: pointer;
   }
+  .prefix-bar select:focus { outline: 1px solid var(--accent); }
 
   /* File list */
-  .file-list { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .file-list { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface); }
   .file-row {
-    display: flex; align-items: center; padding: 10px 14px; gap: 12px;
-    border-bottom: 1px solid var(--border); font-size: 0.85rem;
+    display: flex; align-items: center; padding: 10px 16px; gap: 12px;
+    border-bottom: 1px solid var(--border); font-size: 0.82rem;
+    transition: background 0.1s;
   }
   .file-row:last-child { border-bottom: none; }
-  .file-row .name { flex: 1; word-break: break-all; }
-  .file-row .size { color: var(--text-dim); min-width: 70px; text-align: right; }
-  .file-row .date { color: var(--text-dim); min-width: 90px; text-align: right; }
+  .file-row:hover { background: var(--surface2); }
+  .file-row .name { flex: 1; word-break: break-all; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--text); }
+  .file-row .size { color: var(--text-dim); min-width: 72px; text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; }
+  .file-row .date { color: var(--text-dim); min-width: 92px; text-align: right; font-size: 0.75rem; }
   .file-row .actions { display: flex; gap: 6px; }
-  .file-row:hover { background: var(--surface); }
 
   button.btn {
-    padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border);
-    background: var(--surface); color: var(--text); cursor: pointer; font-size: 0.8rem;
+    padding: 4px 11px; border-radius: 4px; border: 1px solid var(--border);
+    background: var(--surface2); color: var(--text-dim); cursor: pointer;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
+    transition: color 0.15s, border-color 0.15s;
   }
-  button.btn:hover { border-color: var(--accent); }
-  button.btn.danger { color: var(--danger); }
-  button.btn.danger:hover { border-color: var(--danger); }
+  button.btn:hover { color: var(--accent); border-color: var(--accent); }
+  button.btn.danger { }
+  button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 
-  .status { padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 0.85rem; }
-  .status.ok { background: #0d1f0d; color: var(--success); }
-  .status.err { background: #1f0d0d; color: var(--danger); }
+  /* Status */
+  .status {
+    padding: 9px 14px; border-radius: 6px; margin-bottom: 14px;
+    font-size: 0.84rem; font-family: 'JetBrains Mono', monospace;
+    border-left: 3px solid;
+  }
+  .status.ok  { background: rgba(0,240,194,0.07); color: var(--success); border-color: var(--accent); }
+  .status.err { background: rgba(248,81,73,0.08); color: var(--danger);  border-color: var(--danger); }
 
-  .empty { padding: 40px; text-align: center; color: var(--text-dim); }
-  .loading { padding: 20px; text-align: center; color: var(--text-dim); }
+  .empty   { padding: 48px; text-align: center; color: var(--text-dim); font-size: 0.9rem; }
+  .loading { padding: 24px; text-align: center; color: var(--text-dim); font-size: 0.85rem; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--accent-dk); }
 </style>
 </head>
 <body>
 
-<h1>Ultrabroken Media <span>— Asset Manager</span></h1>
+<header>
+  <h1>Ultrabroken Archives <span class="sub">Media Asset Manager</span></h1>
+</header>
 
 <div class="tabs">
   <button class="active" onclick="switchTab('screens/')">screens/</button>
@@ -282,7 +339,8 @@ const MANAGE_HTML = `<!DOCTYPE html>
 </div>
 
 <div class="upload-zone" id="dropzone">
-  <p>Drop files here or click to upload</p>
+  <p><strong>Drop files here</strong> or click to browse</p>
+  <p style="margin-top:6px;font-size:0.78rem;">Max 25 MB per file &mdash; AVIF, WebP, PNG, WebM&hellip;</p>
   <input type="file" id="fileInput" multiple hidden>
 </div>
 

@@ -139,6 +139,25 @@ async function handleDelete(request, env) {
   return Response.json({ deleted: key });
 }
 
+async function handlePurge(request, env) {
+  const { prefix } = await request.json();
+
+  if (!prefix || !ALLOWED_PREFIXES.some((p) => prefix === p || prefix.startsWith(p))) {
+    return Response.json({ error: "Invalid prefix" }, { status: 400 });
+  }
+
+  let deleted = 0;
+  let cursor;
+  do {
+    const listed = await env.MEDIA.list({ prefix, limit: 1000, cursor });
+    await Promise.all(listed.objects.map((obj) => env.MEDIA.delete(obj.key)));
+    deleted += listed.objects.length;
+    cursor = listed.truncated ? listed.cursor : undefined;
+  } while (cursor);
+
+  return Response.json({ purged: prefix, deleted });
+}
+
 // ── Router ──────────────────────────────────────────────────────────
 
 export default {
@@ -171,6 +190,9 @@ export default {
     }
     if (path === "/manage/api/delete" && request.method === "POST") {
       return handleDelete(request, env);
+    }
+    if (path === "/manage/api/purge" && request.method === "POST") {
+      return handlePurge(request, env);
     }
 
     // Public file serving
@@ -329,13 +351,16 @@ const MANAGE_HTML = `<!DOCTYPE html>
 
 <div id="status"></div>
 
-<div class="prefix-bar">
+<div class="prefix-bar" style="justify-content:space-between;">
+  <div style="display:flex;gap:10px;align-items:center;">
   <label>Upload to:</label>
   <select id="prefix">
     <option value="screens/">screens/</option>
     <option value="video/">video/</option>
     <option value="social/">social/</option>
   </select>
+  </div>
+  <button class="btn danger" onclick="purgePrefix()" title="Delete ALL files in the current tab's prefix">Purge prefix&hellip;</button>
 </div>
 
 <div class="upload-zone" id="dropzone">
@@ -484,6 +509,28 @@ function copyUrl(key) {
     () => showStatus("Copied: " + url, true),
     () => showStatus("Failed to copy URL", false)
   );
+}
+
+// ── Purge prefix ──
+async function purgePrefix() {
+  if (!confirm('Delete ALL files under ' + currentPrefix + '?\nThis cannot be undone.')) return;
+  try {
+    showStatus('Purging ' + currentPrefix + '...', true);
+    const res = await fetch(API + '/purge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prefix: currentPrefix }),
+    });
+    const data = await res.json();
+    if (data.purged !== undefined) {
+      showStatus('Purged ' + data.deleted + ' file(s) from ' + data.purged, true);
+      loadFiles();
+    } else {
+      showStatus('Purge failed: ' + (data.error || 'unknown'), false);
+    }
+  } catch (e) {
+    showStatus('Purge failed: ' + e.message, false);
+  }
 }
 
 // ── Init ──

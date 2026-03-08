@@ -5,3 +5,7 @@ compatibility_date = "2024-09-23"
 [[r2_buckets]]
 binding = "MEDIA"
 bucket_name = "ultrabroken-media"
+
+# Secrets (set via `wrangler secret put`):
+#   GITHUB_TOKEN — GitHub PAT with actions:write scope, used to trigger transcode workflow
+#   GITHUB_REPO  — (optional) defaults to nan-gogh/ultrabroken-media

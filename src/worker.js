@@ -13,7 +13,7 @@
  */
 
 const ALLOWED_PREFIXES = ["screens/", "video/", "social/"];
-const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB (raw video before transcode)
 
 const MIME_TYPES = {
   avif: "image/avif",
@@ -123,6 +123,25 @@ async function handleUpload(request, env) {
     });
 
     results.push({ key, size: value.size, ok: true });
+  }
+
+  // If any video was uploaded, trigger the transcode workflow
+  const videoUploaded = results.some(r => r.ok && /\.(mp4|mov|webm|mkv)$/i.test(r.key));
+  if (videoUploaded && env.GITHUB_TOKEN) {
+    const videoKeys = results.filter(r => r.ok && /\.(mp4|mov|webm|mkv)$/i.test(r.key)).map(r => r.key);
+    try {
+      await fetch('https://api.github.com/repos/' + (env.GITHUB_REPO || 'nan-gogh/ultrabroken-media') + '/actions/workflows/transcode.yml/dispatches', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'token ' + env.GITHUB_TOKEN,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ref: 'main', inputs: { keys: videoKeys.join(',') } }),
+      });
+    } catch (e) {
+      // Non-fatal — video uploads still succeed, transcode just won't run
+    }
   }
 
   return Response.json({ results });
@@ -330,6 +349,11 @@ const MANAGE_HTML = `<!DOCTYPE html>
   .empty   { padding: 48px; text-align: center; color: var(--text-dim); font-size: 0.9rem; }
   .loading { padding: 24px; text-align: center; color: var(--text-dim); font-size: 0.85rem; }
 
+  /* Progress bar */
+  .progress-bar { width: 100%; height: 4px; background: var(--surface2); border-radius: 2px; margin-top: 10px; overflow: hidden; display: none; }
+  .progress-bar .fill { height: 100%; background: var(--accent); transition: width 0.3s; width: 0; }
+  .convert-info { font-size: 0.75rem; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; margin-top: 6px; text-align: center; display: none; }
+
   /* Scrollbar */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: var(--bg); }
@@ -365,7 +389,10 @@ const MANAGE_HTML = `<!DOCTYPE html>
 
 <div class="upload-zone" id="dropzone">
   <p><strong>Drop files here</strong> or click to browse</p>
-  <p style="margin-top:6px;font-size:0.78rem;">Max 25 MB per file &mdash; AVIF, WebP, PNG, WebM&hellip;</p>
+  <p style="margin-top:6px;font-size:0.78rem;">Images auto-convert to AVIF &mdash; Videos auto-transcode to AV1+Opus</p>
+  <p style="margin-top:3px;font-size:0.72rem;color:var(--text-dim);">Max 50 MB per file</p>
+  <div class="progress-bar" id="convertProgress"><div class="fill" id="convertFill"></div></div>
+  <div class="convert-info" id="convertInfo"></div>
   <input type="file" id="fileInput" multiple hidden>
 </div>
 
@@ -465,24 +492,87 @@ async function uploadFiles(files) {
   const prefix = document.getElementById("prefix").value;
   const form = new FormData();
   form.set("prefix", prefix);
-  for (const f of files) form.append("file", f);
+
+  const progressBar = document.getElementById("convertProgress");
+  const progressFill = document.getElementById("convertFill");
+  const convertInfo = document.getElementById("convertInfo");
+  let converted = 0;
+  const total = files.length;
+
+  for (const f of files) {
+    const isImage = /\\.(png|jpe?g|webp|bmp|tiff?)$/i.test(f.name);
+    if (isImage) {
+      // Auto-convert images to AVIF
+      progressBar.style.display = "block";
+      convertInfo.style.display = "block";
+      convertInfo.textContent = "Converting " + f.name + " to AVIF...";
+      progressFill.style.width = ((converted / total) * 100) + "%";
+      try {
+        const avifBlob = await convertToAvif(f);
+        const avifName = f.name.replace(/\\.[^.]+$/, ".avif");
+        const savings = ((1 - avifBlob.size / f.size) * 100).toFixed(0);
+        convertInfo.textContent = f.name + " → " + avifName + " (" + formatSize(avifBlob.size) + ", -" + savings + "%)"; 
+        form.append("file", new File([avifBlob], avifName, { type: "image/avif" }));
+      } catch (e) {
+        convertInfo.textContent = "AVIF conversion failed for " + f.name + ", uploading original";
+        form.append("file", f);
+      }
+    } else {
+      form.append("file", f);
+    }
+    converted++;
+    progressFill.style.width = ((converted / total) * 100) + "%";
+  }
 
   try {
-    showStatus("Uploading " + files.length + " file(s)...", true);
+    convertInfo.textContent = "Uploading...";
+    showStatus("Uploading " + total + " file(s)...", true);
     const res = await fetch(API + "/upload", { method: "POST", body: form });
     const data = await res.json();
     const ok = data.results.filter(r => r.ok).length;
     const fail = data.results.filter(r => r.error);
+    const videoCount = data.results.filter(r => r.ok && /\\.(mp4|mov|webm|mkv)$/i.test(r.key)).length;
+    let msg = ok + " file(s) uploaded";
+    if (videoCount) msg += " — " + videoCount + " video(s) queued for AV1 transcode";
     if (fail.length) {
       showStatus(ok + " uploaded, " + fail.length + " failed: " + fail.map(f => f.key + " (" + f.error + ")").join(", "), false);
     } else {
-      showStatus(ok + " file(s) uploaded", true);
+      showStatus(msg, true);
     }
     loadFiles();
   } catch (e) {
     showStatus("Upload failed: " + e.message, false);
   }
+  progressBar.style.display = "none";
+  convertInfo.style.display = "none";
   fileInput.value = "";
+}
+
+async function convertToAvif(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      // Scale down if larger than 1920x1080
+      let w = img.naturalWidth, h = img.naturalHeight;
+      if (w > 1920 || h > 1080) {
+        const scale = Math.min(1920 / w, 1080 / h);
+        w = Math.round(w * scale);
+        h = Math.round(h * scale);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, w, h);
+      canvas.toBlob(
+        blob => blob ? resolve(blob) : reject(new Error("toBlob returned null")),
+        "image/avif",
+        0.7
+      );
+    };
+    img.onerror = () => reject(new Error("Failed to load image"));
+    img.src = URL.createObjectURL(file);
+  });
 }
 
 // ── Delete ──

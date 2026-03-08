@@ -1,0 +1,86 @@
+name: Media — Transcode Video to AV1+Opus
+
+on:
+  workflow_dispatch:
+    inputs:
+      keys:
+        description: 'Comma-separated R2 keys to transcode (e.g., video/clip.mp4,video/demo.mov)'
+        required: true
+        type: string
+
+concurrency:
+  group: transcode
+  cancel-in-progress: false
+
+jobs:
+  transcode:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ffmpeg and wrangler
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          npm install -g wrangler@4
+
+      - name: Transcode and re-upload
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+
+          IFS=',' read -ra KEYS <<< "${{ inputs.keys }}"
+
+          for key in "${KEYS[@]}"; do
+            key=$(echo "$key" | xargs)  # trim whitespace
+            ext="${key##*.}"
+            ext_lower=$(echo "$ext" | tr '[:upper:]' '[:lower:]')
+            stem="${key%.*}"
+            out_key="${stem}.webm"
+
+            # Skip if already a webm (likely already transcoded)
+            if [ "$ext_lower" = "webm" ]; then
+              echo "Skipping $key — already WebM"
+              continue
+            fi
+
+            echo "=== Transcoding: $key ==="
+
+            # Download from R2
+            wrangler r2 object get "ultrabroken-media/$key" --file="input.$ext_lower" --remote
+
+            original_size=$(stat -c%s "input.$ext_lower")
+            echo "Original: $(numfmt --to=iec $original_size)"
+
+            # Transcode: AV1+Opus, max 1080p30, CRF 35
+            ffmpeg -i "input.$ext_lower" \
+              -c:v libsvtav1 -crf 35 -preset 6 \
+              -vf "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease" \
+              -r 30 \
+              -c:a libopus -b:a 96k \
+              -y "output.webm"
+
+            new_size=$(stat -c%s "output.webm")
+            savings=$(( (original_size - new_size) * 100 / original_size ))
+            echo "Transcoded: $(numfmt --to=iec $new_size) (-${savings}%)"
+
+            # Upload transcoded file
+            wrangler r2 object put "ultrabroken-media/$out_key" \
+              --file="output.webm" --content-type="video/webm" --remote
+            echo "Uploaded: $out_key"
+
+            # Delete the original if the key changed
+            if [ "$key" != "$out_key" ]; then
+              wrangler r2 object delete "ultrabroken-media/$key" --remote
+              echo "Deleted original: $key"
+            fi
+
+            # Cleanup temp files
+            rm -f "input.$ext_lower" "output.webm"
+            echo "=== Done: $key → $out_key ==="
+            echo ""
+          done
+
+          echo "All transcoding complete"

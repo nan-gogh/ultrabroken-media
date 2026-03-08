@@ -451,11 +451,13 @@ function switchTab(prefix) {
 }
 
 // â”€â”€ Status messages â”€â”€
-function showStatus(msg, ok) {
+let statusTimer = null;
+function showStatus(msg, ok, duration) {
   const el = document.getElementById("status");
   el.className = "status " + (ok ? "ok" : "err");
   el.textContent = msg;
-  setTimeout(() => { el.textContent = ""; el.className = "status"; }, 5000);
+  if (statusTimer) clearTimeout(statusTimer);
+  statusTimer = setTimeout(() => { el.textContent = ""; el.className = "status"; }, duration || 8000);
 }
 
 // â”€â”€ Load file list â”€â”€
@@ -623,7 +625,7 @@ function scheduleRefresh() {
       clearInterval(refreshTimer);
       refreshTimer = null;
     }
-  }, 30000);
+  }, 10000);
 }
 
 // patch loadFiles to trigger auto-refresh

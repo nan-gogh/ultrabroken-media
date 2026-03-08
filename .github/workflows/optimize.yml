@@ -28,40 +28,10 @@ jobs:
           path: ~/.npm
           key: ${{ runner.os }}-npm-optimize
 
-      - name: Install wrangler
-        run: npm install -g wrangler@4
-
-      - name: Create sharp conversion script
+      - name: Install wrangler and sharp
         run: |
-          cat > convert.js << 'EOF'
-          const sharp = require('sharp');
-          const fs = require('fs');
-          const path = require('path');
-
-          async function convert(inputFile, outputFile) {
-            try {
-              await sharp(inputFile)
-                .avif({ quality: 65 })
-                .toFile(outputFile);
-              console.log(`Converted: ${inputFile} -> ${outputFile}`);
-            } catch (err) {
-              console.error('Conversion failed:', err);
-              process.exit(1);
-            }
-          }
-
-          const args = process.argv.slice(2);
-          if (args.length !== 2) {
-            console.error('Usage: node convert.js <input> <output>');
-            process.exit(1);
-          }
-
-          convert(args[0], args[1]);
-          EOF
-        working-directory: /tmp
-
-      - name: Install sharp
-        run: npm install --prefix /tmp sharp
+          npm install -g wrangler@4
+          npm install --prefix /tmp sharp
 
       - name: Optimize and re-upload
         env:
@@ -93,8 +63,14 @@ jobs:
             original_size=$(stat -c%s "input.$ext_lower")
             echo "Original: $(numfmt --to=iec $original_size)"
 
-            # Convert to AVIF using sharp (Node.js)
-            node /tmp/convert.js "input.$ext_lower" "output.avif"
+            # Convert to AVIF using sharp
+            NODE_PATH=/tmp/node_modules node -e "
+              const sharp = require('sharp');
+              sharp(process.argv[1]).avif({ quality: 65 }).toFile(process.argv[2]).then(
+                info => console.log('Converted:', info.width + 'x' + info.height, info.size + ' bytes'),
+                err => { console.error(err); process.exit(1); }
+              );
+            " "input.$ext_lower" "output.avif"
 
             new_size=$(stat -c%s "output.avif")
             savings=$(( (original_size - new_size) * 100 / original_size ))

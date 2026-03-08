@@ -1,21 +1,24 @@
 # Ultrabroken Media
 
-Media assets (screenshots, video clips, social cards) for the [Ultrabroken Archives](https://nan-gogh.github.io/ultrabroken-documentation/) wiki. Deployed to Cloudflare Pages — git history is orphan-reset after each deploy so the repo never accumulates stale blobs.
+Cloudflare Worker + R2 backend for hosting media assets (screenshots, video clips, social cards) for the [Ultrabroken Archives](https://nan-gogh.github.io/ultrabroken-documentation/) wiki.
 
-## Structure
+## Architecture
+
+- **R2 bucket** — stores all media files (screens, video, social cards)
+- **Worker** — serves files publicly, hosts a management UI at `/manage`
+- **Cloudflare Access** — gates `/manage` with GitHub OAuth (editors log in with their GitHub account)
+
+## File Structure (in R2)
 
 ```
-screens/   → Screenshots (AVIF, compressed locally before committing)
-video/     → Video clips (AV1+Opus WebM, compressed locally before committing)
-social/    → Social card PNGs (synced automatically from docs build)
+screens/   → Screenshots (AVIF)
+video/     → Video clips (AV1+Opus WebM)
+social/    → Social card PNGs
 ```
 
-## Adding Media
+## Managing Media
 
-1. **Compress locally** before committing — use [Squoosh](https://squoosh.app/) for images (AVIF) and HandBrake or ffmpeg for video (AV1+Opus WebM).
-2. Drop compressed files into `screens/` or `video/`.
-3. Commit to `main` — CI deploys to Cloudflare Pages and resets history.
-4. The `social/` folder is managed automatically by the docs repo build — don't edit it manually.
+Go to `https://ultrabroken-media.<your-subdomain>.workers.dev/manage` and log in with GitHub. From there you can upload, browse, copy URLs, and delete files.
 
 ## Referencing Media from the Wiki
 
@@ -25,10 +28,8 @@ In the docs repo, use the `media:` prefix:
 ![Nachoyah Shrine VD](media:screens/nachoyah-vd.avif)
 ```
 
-The build hook expands this to the full Cloudflare Pages URL.
+The build hook expands this to the full Worker URL.
 
-## Serving URL
+## Setup
 
-```
-https://ultrabroken-media.pages.dev/
-```
+See `SETUP.md` for initial Cloudflare dashboard configuration (R2 bucket, Access policy, secrets).

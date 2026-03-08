@@ -2,14 +2,14 @@
  * Ultrabroken Media Worker
  *
  * Serves media files from R2 (public) and provides a management UI
- * at /manage (protected by Cloudflare Access — GitHub OAuth).
+ * at /manage (protected by Cloudflare Access â€” GitHub OAuth).
  *
  * Routes:
- *   GET  /manage           → Management UI (upload, browse, delete)
- *   GET  /manage/api/list  → JSON listing of files in a prefix
- *   POST /manage/api/upload → Upload file(s) to R2
- *   POST /manage/api/delete → Delete a file from R2
- *   GET  /*                 → Serve file from R2 (public)
+ *   GET  /manage           â†’ Management UI (upload, browse, delete)
+ *   GET  /manage/api/list  â†’ JSON listing of files in a prefix
+ *   POST /manage/api/upload â†’ Upload file(s) to R2
+ *   POST /manage/api/delete â†’ Delete a file from R2
+ *   GET  /*                 â†’ Serve file from R2 (public)
  */
 
 const ALLOWED_PREFIXES = ["screens/", "video/", "social/"];
@@ -41,7 +41,7 @@ function isValidKey(key) {
   return ALLOWED_PREFIXES.some((p) => key.startsWith(p));
 }
 
-// ── Public file serving ─────────────────────────────────────────────
+// â”€â”€ Public file serving â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function handleGet(request, env) {
   const url = new URL(request.url);
@@ -65,7 +65,7 @@ async function handleGet(request, env) {
   return new Response(object.body, { headers });
 }
 
-// ── Management API ──────────────────────────────────────────────────
+// â”€â”€ Management API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function handleList(request, env) {
   const url = new URL(request.url);
@@ -83,6 +83,7 @@ async function handleList(request, env) {
     size: obj.size,
     uploaded: obj.uploaded,
     transcode: obj.customMetadata?.transcode || null,
+    optimize: obj.customMetadata?.optimize || null,
   }));
 
   return Response.json({
@@ -124,6 +125,8 @@ async function handleUpload(request, env) {
     };
     if (/\.(mp4|mov|mkv)$/i.test(key)) {
       putOptions.customMetadata = { transcode: 'pending' };
+    } else if (/\.(png|jpe?g|webp|bmp|tiff?)$/i.test(key)) {
+      putOptions.customMetadata = { optimize: 'pending' };
     }
     await env.MEDIA.put(key, value.stream(), putOptions);
 
@@ -145,7 +148,26 @@ async function handleUpload(request, env) {
         body: JSON.stringify({ ref: 'main', inputs: { keys: videoKeys.join(',') } }),
       });
     } catch (e) {
-      // Non-fatal — video uploads still succeed, transcode just won't run
+      // Non-fatal â€” video uploads still succeed, transcode just won't run
+    }
+  }
+
+  // If any image was uploaded, trigger the optimize workflow
+  const imageUploaded = results.some(r => r.ok && /\.(png|jpe?g|webp|bmp|tiff?)$/i.test(r.key));
+  if (imageUploaded && env.GITHUB_TOKEN) {
+    const imageKeys = results.filter(r => r.ok && /\.(png|jpe?g|webp|bmp|tiff?)$/i.test(r.key)).map(r => r.key);
+    try {
+      await fetch('https://api.github.com/repos/' + (env.GITHUB_REPO || 'nan-gogh/ultrabroken-media') + '/actions/workflows/optimize.yml/dispatches', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'token ' + env.GITHUB_TOKEN,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ref: 'main', inputs: { keys: imageKeys.join(',') } }),
+      });
+    } catch (e) {
+      // Non-fatal
     }
   }
 
@@ -182,7 +204,7 @@ async function handlePurge(request, env) {
   return Response.json({ purged: prefix, deleted });
 }
 
-// ── Router ──────────────────────────────────────────────────────────
+// â”€â”€ Router â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default {
   async fetch(request, env) {
@@ -228,14 +250,14 @@ export default {
   },
 };
 
-// ── Inline Management UI ────────────────────────────────────────────
+// â”€â”€ Inline Management UI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const MANAGE_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Ultrabroken Media — Manage</title>
+<title>Ultrabroken Media â€” Manage</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=New+Rocker&family=Texturina:ital,opsz,wght@0,12..44,100..900;1,12..44,100..900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -367,11 +389,6 @@ const MANAGE_HTML = `<!DOCTYPE html>
   .empty   { padding: 48px; text-align: center; color: var(--text-dim); font-size: 0.9rem; }
   .loading { padding: 24px; text-align: center; color: var(--text-dim); font-size: 0.85rem; }
 
-  /* Progress bar */
-  .progress-bar { width: 100%; height: 4px; background: var(--surface2); border-radius: 2px; margin-top: 10px; overflow: hidden; display: none; }
-  .progress-bar .fill { height: 100%; background: var(--accent); transition: width 0.3s; width: 0; }
-  .convert-info { font-size: 0.75rem; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; margin-top: 6px; text-align: center; display: none; }
-
   /* Scrollbar */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: var(--bg); }
@@ -407,10 +424,8 @@ const MANAGE_HTML = `<!DOCTYPE html>
 
 <div class="upload-zone" id="dropzone">
   <p><strong>Drop files here</strong> or click to browse</p>
-  <p style="margin-top:6px;font-size:0.78rem;">Images auto-convert to AVIF/WebP &mdash; Videos auto-transcode to AV1+Opus</p>
-  <p style="margin-top:3px;font-size:0.72rem;color:var(--text-dim);">Max 50 MB per file</p>
-  <div class="progress-bar" id="convertProgress"><div class="fill" id="convertFill"></div></div>
-  <div class="convert-info" id="convertInfo"></div>
+  <p style="margin-top:6px;font-size:0.78rem;">Images auto-optimize to AVIF &mdash; Videos auto-transcode to AV1+Opus</p>
+  <p style="margin-top:3px;font-size:0.72rem;color:var(--text-dim);">Max 50 MB per file &mdash; Optimization runs server-side via GitHub Actions</p>
   <input type="file" id="fileInput" multiple hidden>
 </div>
 
@@ -422,7 +437,7 @@ const MANAGE_HTML = `<!DOCTYPE html>
 const API = "/manage/api";
 let currentPrefix = "screens/";
 
-// ── Tab switching ──
+// â”€â”€ Tab switching â”€â”€
 function switchTab(prefix) {
   currentPrefix = prefix;
   document.getElementById("prefix").value = prefix;
@@ -431,7 +446,7 @@ function switchTab(prefix) {
   loadFiles();
 }
 
-// ── Status messages ──
+// â”€â”€ Status messages â”€â”€
 function showStatus(msg, ok) {
   const el = document.getElementById("status");
   el.className = "status " + (ok ? "ok" : "err");
@@ -439,7 +454,7 @@ function showStatus(msg, ok) {
   setTimeout(() => { el.textContent = ""; el.className = "status"; }, 5000);
 }
 
-// ── Load file list ──
+// â”€â”€ Load file list â”€â”€
 async function loadFiles() {
   const container = document.getElementById("fileListContainer");
   container.innerHTML = '<div class="loading">Loading...</div>';
@@ -468,6 +483,8 @@ async function loadFiles() {
       const date = new Date(f.uploaded).toLocaleDateString();
       const badge = f.transcode === 'pending'
         ? '<span class="badge-transcode">\u23F3 transcoding</span>'
+        : f.optimize === 'pending'
+        ? '<span class="badge-transcode">\u23F3 optimizing</span>'
         : '';
       html += '<div class="file-row">'
         + '<span class="name">' + escHtml(name) + ' ' + badge + '</span>'
@@ -494,7 +511,7 @@ function formatSize(bytes) {
 function escHtml(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
 function escAttr(s) { return s.replace(/'/g, "\\\\'").replace(/"/g, "&quot;"); }
 
-// ── Upload ──
+// â”€â”€ Upload â”€â”€
 const dropzone = document.getElementById("dropzone");
 const fileInput = document.getElementById("fileInput");
 
@@ -514,47 +531,21 @@ async function uploadFiles(files) {
   const form = new FormData();
   form.set("prefix", prefix);
 
-  const progressBar = document.getElementById("convertProgress");
-  const progressFill = document.getElementById("convertFill");
-  const convertInfo = document.getElementById("convertInfo");
-  let converted = 0;
-  const total = files.length;
-
   for (const f of files) {
-    const isImage = /\\.(png|jpe?g|webp|bmp|tiff?)$/i.test(f.name);
-    if (isImage) {
-      // Auto-convert images to AVIF
-      progressBar.style.display = "block";
-      convertInfo.style.display = "block";
-      convertInfo.textContent = "Converting " + f.name + " to AVIF...";
-      progressFill.style.width = ((converted / total) * 100) + "%";
-      try {
-        const result = await convertToAvif(f);
-        const newName = f.name.replace(/\\.[^.]+$/, "." + result.ext);
-        const savings = ((1 - result.blob.size / f.size) * 100).toFixed(0);
-        convertInfo.textContent = f.name + " \u2192 " + newName + " (" + formatSize(result.blob.size) + ", -" + savings + "%)"; 
-        form.append("file", new File([result.blob], newName, { type: result.mime }));
-      } catch (e) {
-        convertInfo.textContent = "AVIF conversion failed for " + f.name + ", uploading original";
-        form.append("file", f);
-      }
-    } else {
-      form.append("file", f);
-    }
-    converted++;
-    progressFill.style.width = ((converted / total) * 100) + "%";
+    form.append("file", f);
   }
 
   try {
-    convertInfo.textContent = "Uploading...";
-    showStatus("Uploading " + total + " file(s)...", true);
+    showStatus("Uploading " + files.length + " file(s)...", true);
     const res = await fetch(API + "/upload", { method: "POST", body: form });
     const data = await res.json();
     const ok = data.results.filter(r => r.ok).length;
     const fail = data.results.filter(r => r.error);
-    const videoCount = data.results.filter(r => r.ok && /\\.(mp4|mov|webm|mkv)$/i.test(r.key)).length;
+    const videoCount = data.results.filter(r => r.ok && /\.(mp4|mov|webm|mkv)$/i.test(r.key)).length;
+    const imageCount = data.results.filter(r => r.ok && /\.(png|jpe?g|webp|bmp|tiff?)$/i.test(r.key)).length;
     let msg = ok + " file(s) uploaded";
-    if (videoCount) msg += " — " + videoCount + " video(s) queued for AV1 transcode";
+    if (imageCount) msg += " \u2014 " + imageCount + " image(s) queued for AVIF optimization";
+    if (videoCount) msg += " \u2014 " + videoCount + " video(s) queued for AV1 transcode";
     if (fail.length) {
       showStatus(ok + " uploaded, " + fail.length + " failed: " + fail.map(f => f.key + " (" + f.error + ")").join(", "), false);
     } else {
@@ -564,50 +555,10 @@ async function uploadFiles(files) {
   } catch (e) {
     showStatus("Upload failed: " + e.message, false);
   }
-  progressBar.style.display = "none";
-  convertInfo.style.display = "none";
   fileInput.value = "";
 }
 
-async function convertToAvif(file) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      let w = img.naturalWidth, h = img.naturalHeight;
-      if (w > 1920 || h > 1080) {
-        const scale = Math.min(1920 / w, 1080 / h);
-        w = Math.round(w * scale);
-        h = Math.round(h * scale);
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, w, h);
-      // Try AVIF first, fall back to WebP
-      canvas.toBlob(
-        blob => {
-          if (blob && blob.type === "image/avif") {
-            resolve({ blob, ext: "avif", mime: "image/avif" });
-          } else {
-            canvas.toBlob(
-              wb => wb ? resolve({ blob: wb, ext: "webp", mime: "image/webp" })
-                       : reject(new Error("toBlob returned null")),
-              "image/webp",
-              0.82
-            );
-          }
-        },
-        "image/avif",
-        0.7
-      );
-    };
-    img.onerror = () => reject(new Error("Failed to load image"));
-    img.src = URL.createObjectURL(file);
-  });
-}
-
-// ── Delete ──
+// â”€â”€ Delete â”€â”€
 async function deleteFile(key) {
   if (!confirm("Delete " + key + "?")) return;
   try {
@@ -624,7 +575,7 @@ async function deleteFile(key) {
   }
 }
 
-// ── Copy URL ──
+// â”€â”€ Copy URL â”€â”€
 function copyUrl(key) {
   const url = location.origin + "/" + key;
   navigator.clipboard.writeText(url).then(
@@ -633,7 +584,7 @@ function copyUrl(key) {
   );
 }
 
-// ── Purge prefix ──
+// â”€â”€ Purge prefix â”€â”€
 async function purgePrefix() {
   if (!confirm('Delete ALL files under ' + currentPrefix + '?\\nThis cannot be undone.')) return;
   try {
@@ -655,7 +606,7 @@ async function purgePrefix() {
   }
 }
 
-// ── Auto-refresh for pending transcodes ──
+// â”€â”€ Auto-refresh for pending transcodes â”€â”€
 let refreshTimer = null;
 function scheduleRefresh() {
   if (refreshTimer) return;
@@ -678,7 +629,7 @@ loadFiles = async function() {
   if (document.querySelector('.badge-transcode')) scheduleRefresh();
 };
 
-// ── Init ──
+// â”€â”€ Init â”€â”€
 loadFiles();
 </script>
 </body>

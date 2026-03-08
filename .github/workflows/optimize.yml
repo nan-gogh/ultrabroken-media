@@ -28,8 +28,40 @@ jobs:
           path: ~/.npm
           key: ${{ runner.os }}-npm-optimize
 
-      - name: Install tools
-        run: npm install -g wrangler@4 sharp-cli
+      - name: Install wrangler
+        run: npm install -g wrangler@4
+
+      - name: Create sharp conversion script
+        run: |
+          cat > convert.js << 'EOF'
+          const sharp = require('sharp');
+          const fs = require('fs');
+          const path = require('path');
+
+          async function convert(inputFile, outputFile) {
+            try {
+              await sharp(inputFile)
+                .avif({ quality: 65 })
+                .toFile(outputFile);
+              console.log(`Converted: ${inputFile} -> ${outputFile}`);
+            } catch (err) {
+              console.error('Conversion failed:', err);
+              process.exit(1);
+            }
+          }
+
+          const args = process.argv.slice(2);
+          if (args.length !== 2) {
+            console.error('Usage: node convert.js <input> <output>');
+            process.exit(1);
+          }
+
+          convert(args[0], args[1]);
+          EOF
+        working-directory: /tmp
+
+      - name: Install sharp
+        run: npm install --prefix /tmp sharp
 
       - name: Optimize and re-upload
         env:
@@ -61,22 +93,29 @@ jobs:
             original_size=$(stat -c%s "input.$ext_lower")
             echo "Original: $(numfmt --to=iec $original_size)"
 
-            # Convert to AVIF using sharp-cli
-            npx sharp-cli -i "input.$ext_lower" -o "output.avif" --format avif --quality 65
+            # Convert to AVIF using sharp (Node.js)
+            node /tmp/convert.js "input.$ext_lower" "output.avif"
 
             new_size=$(stat -c%s "output.avif")
             savings=$(( (original_size - new_size) * 100 / original_size ))
             echo "Optimized: $(numfmt --to=iec $new_size) (-${savings}%)"
 
-            # Upload AVIF version
-            wrangler r2 object put "ultrabroken-media/$out_key" \
-              --file="output.avif" --content-type="image/avif" --remote
-            echo "Uploaded: $out_key"
+            # If AVIF is larger, keep the original instead
+            if [ $new_size -gt $original_size ]; then
+              echo "AVIF is larger ($new_size > $original_size), keeping original"
+              rm "output.avif"
+              # Don't upload; original remains on R2
+            else
+              # Upload AVIF version
+              wrangler r2 object put "ultrabroken-media/$out_key" \
+                --file="output.avif" --content-type="image/avif" --remote
+              echo "Uploaded: $out_key"
 
-            # Delete the original if the key changed
-            if [ "$key" != "$out_key" ]; then
-              wrangler r2 object delete "ultrabroken-media/$key" --remote
-              echo "Deleted original: $key"
+              # Delete the original if the key changed
+              if [ "$key" != "$out_key" ]; then
+                wrangler r2 object delete "ultrabroken-media/$key" --remote
+                echo "Deleted original: $key"
+              fi
             fi
 
             # Cleanup temp files

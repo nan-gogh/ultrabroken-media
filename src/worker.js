@@ -513,7 +513,7 @@ function copyUrl(key) {
 
 // ── Purge prefix ──
 async function purgePrefix() {
-  if (!confirm('Delete ALL files under ' + currentPrefix + '?\nThis cannot be undone.')) return;
+  if (!confirm('Delete ALL files under ' + currentPrefix + '?\\nThis cannot be undone.')) return;
   try {
     showStatus('Purging ' + currentPrefix + '...', true);
     const res = await fetch(API + '/purge', {

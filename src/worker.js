@@ -290,7 +290,7 @@ const MANAGE_HTML = `<!DOCTYPE html>
   }
 
   /* Header */
-  header { margin-bottom: 32px; border-bottom: 1px solid var(--border); padding-bottom: 20px; }
+  header { margin-bottom: 32px; border-bottom: 1px solid var(--border); padding-bottom: 20px; display: flex; align-items: center; justify-content: space-between; }
   h1 {
     font-family: 'New Rocker', serif;
     font-size: 2rem; font-weight: normal; letter-spacing: 0.04em;
@@ -406,6 +406,7 @@ const MANAGE_HTML = `<!DOCTYPE html>
 
 <header>
   <h1>Ultrabroken Archives <span class="sub">Media Vault</span></h1>
+  <a class="btn" href="/cdn-cgi/access/logout">Logout</a>
 </header>
 
 <div class="tabs">

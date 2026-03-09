@@ -76,6 +76,7 @@ async function handleList(request, env) {
     prefix: prefix || undefined,
     limit: 1000,
     cursor,
+    include: ['customMetadata'],
   });
 
   const files = listed.objects.map((obj) => ({

@@ -371,13 +371,14 @@ const MANAGE_HTML = `<!DOCTYPE html>
     50% { opacity: 0.5; }
   }
 
-  button.btn {
+  button.btn, a.btn {
     padding: 4px 11px; border-radius: 4px; border: 1px solid var(--border);
     background: var(--surface2); color: var(--text-dim); cursor: pointer;
     font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
     transition: color 0.15s, border-color 0.15s;
+    text-decoration: none; display: inline-block; line-height: 1.4;
   }
-  button.btn:hover { color: var(--accent); border-color: var(--accent); }
+  button.btn:hover, a.btn:hover { color: var(--accent); border-color: var(--accent); }
   button.btn.danger { }
   button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 
@@ -503,6 +504,7 @@ async function loadFiles() {
         + '<span class="size">' + size + '</span>'
         + '<span class="date">' + date + '</span>'
         + '<span class="actions">'
+        + '  <a class="btn" href="/' + encodeURI(f.key) + '" download title="Download">&#8595;</a>'
         + '  <button class="btn" onclick="copyUrl(\\'' + escAttr(f.key) + '\\')">Copy URL</button>'
         + '  <button class="btn danger" onclick="deleteFile(\\'' + escAttr(f.key) + '\\')">Delete</button>'
         + '</span></div>';

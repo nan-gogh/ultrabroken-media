@@ -18,21 +18,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache ffmpeg
-        id: cache-ffmpeg
-        uses: actions/cache@v4
-        with:
-          path: /usr/local/bin/ffmpeg
-          key: ffmpeg-gpl-static-linux64-v1
-
       - name: Install ffmpeg
-        if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
-        run: |
-          wget -q -O /tmp/ff.tar.xz \
-            'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl-static.tar.xz'
-          tar -xJf /tmp/ff.tar.xz -C /tmp ffmpeg-master-latest-linux64-gpl-static/bin/ffmpeg
-          sudo mv /tmp/ffmpeg-master-latest-linux64-gpl-static/bin/ffmpeg /usr/local/bin/ffmpeg
-          rm -rf /tmp/ff.tar.xz /tmp/ffmpeg-master-latest-linux64-gpl-static
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
 
       - name: Cache npm packages
         uses: actions/cache@v4

@@ -18,7 +18,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ffmpeg is pre-installed on ubuntu-latest
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
 
       - name: Cache npm packages
         uses: actions/cache@v4

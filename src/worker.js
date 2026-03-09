@@ -136,9 +136,9 @@ async function handleUpload(request, env) {
 
   // Dispatch optimization/transcode workflows
   const dispatches = [];
-  const videoUploaded = results.some(r => r.ok && /\.(mp4|mov|webm|mkv)$/i.test(r.key));
+  const videoUploaded = results.some(r => r.ok && /\.(mp4|mov|mkv)$/i.test(r.key));
   if (videoUploaded && env.GITHUB_TOKEN) {
-    const videoKeys = results.filter(r => r.ok && /\.(mp4|mov|webm|mkv)$/i.test(r.key)).map(r => r.key);
+    const videoKeys = results.filter(r => r.ok && /\.(mp4|mov|mkv)$/i.test(r.key)).map(r => r.key);
     try {
       const resp = await fetch('https://api.github.com/repos/' + (env.GITHUB_REPO || 'nan-gogh/ultrabroken-media') + '/actions/workflows/transcode.yml/dispatches', {
         method: 'POST',
@@ -615,14 +615,18 @@ async function purgePrefix() {
 
 // â”€â”€ Auto-refresh for pending transcodes â”€â”€
 let refreshTimer = null;
+let refreshCount = 0;
+const MAX_REFRESHES = 30; // stop after ~5 min
 function scheduleRefresh() {
   if (refreshTimer) return;
+  refreshCount = 0;
   refreshTimer = setInterval(async () => {
+    refreshCount++;
     const container = document.getElementById('fileListContainer');
     const scrollY = container.scrollTop;
     await loadFiles();
     container.scrollTop = scrollY;
-    if (!document.querySelector('.badge-transcode')) {
+    if (!document.querySelector('.badge-transcode') || refreshCount >= MAX_REFRESHES) {
       clearInterval(refreshTimer);
       refreshTimer = null;
     }

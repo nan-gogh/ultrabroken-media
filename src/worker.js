@@ -418,7 +418,7 @@ const MANAGE_HTML = `<!DOCTYPE html>
 <div class="prefix-bar" style="justify-content:space-between;">
   <div style="display:flex;gap:10px;align-items:center;">
   <label>Upload to:</label>
-  <select id="prefix">
+  <select id="prefix" onchange="switchTab(this.value)">
     <option value="screens/">screens/</option>
     <option value="video/">video/</option>
     <option value="social/">social/</option>
@@ -429,9 +429,9 @@ const MANAGE_HTML = `<!DOCTYPE html>
 
 <div class="upload-zone" id="dropzone">
   <p><strong>Drop files here</strong> or click to browse</p>
-  <p style="margin-top:6px;font-size:0.78rem;">Images auto-optimize to AVIF &mdash; Videos auto-transcode to AV1+Opus</p>
+  <p id="dropzoneHint" style="margin-top:6px;font-size:0.78rem;">Images only &mdash; auto-optimize to AVIF</p>
   <p style="margin-top:3px;font-size:0.72rem;color:var(--text-dim);">Max 50 MB per file &mdash; Optimization runs server-side via GitHub Actions</p>
-  <input type="file" id="fileInput" multiple hidden>
+  <input type="file" id="fileInput" multiple hidden accept="image/*">
 </div>
 
 <div id="fileListContainer">
@@ -448,6 +448,11 @@ function switchTab(prefix) {
   document.getElementById("prefix").value = prefix;
   document.querySelectorAll(".tabs button").forEach(b =>
     b.classList.toggle("active", b.textContent.trim() === prefix));
+  const isVideo = prefix === 'video/';
+  document.getElementById("fileInput").accept = isVideo ? 'video/*' : 'image/*';
+  document.getElementById("dropzoneHint").textContent = isVideo
+    ? 'Videos only \u2014 auto-transcode to AV1+Opus WebM'
+    : 'Images only \u2014 auto-optimize to AVIF';
   loadFiles();
 }
 
@@ -532,12 +537,19 @@ dropzone.addEventListener("drop", e => {
 });
 fileInput.addEventListener("change", () => uploadFiles(fileInput.files));
 
-async function uploadFiles(files) {
-  if (!files.length) return;
+async function uploadFiles(rawFiles) {
+  if (!rawFiles.length) return;
   const prefix = document.getElementById("prefix").value;
+  const isVideo = prefix === 'video/';
+  const files = Array.from(rawFiles).filter(f =>
+    isVideo ? f.type.startsWith('video/') : f.type.startsWith('image/')
+  );
+  const rejected = rawFiles.length - files.length;
+  if (rejected > 0) showStatus(rejected + ' file(s) skipped \u2014 ' + prefix + ' only accepts ' + (isVideo ? 'videos' : 'images'), false);
+  if (!files.length) return;
+
   const form = new FormData();
   form.set("prefix", prefix);
-
   for (const f of files) {
     form.append("file", f);
   }

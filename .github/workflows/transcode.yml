@@ -75,7 +75,7 @@ jobs:
 
             # Transcode: AV1+Opus, max 1080p30, CRF 35
             ffmpeg -i "input.$ext_lower" \
-              -c:v libsvtav1 -crf 35 -preset 8 \
+              -c:v libsvtav1 -crf 35 -preset 6 \
               -vf "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease" \
               -r 30 \
               -c:a libopus -b:a 96k \

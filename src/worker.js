@@ -58,9 +58,16 @@ async function handleGet(request, env) {
 
   const headers = new Headers();
   headers.set("Content-Type", getMime(key));
-  headers.set("Cache-Control", "public, max-age=31536000, immutable");
+  headers.set("Cache-Control", "public, max-age=300, must-revalidate");
+  headers.set("ETag", object.httpEtag);
   headers.set("Access-Control-Allow-Origin", "*");
   object.writeHttpMetadata(headers);
+
+  // Return 304 if client's cached version matches
+  const ifNoneMatch = request.headers.get("If-None-Match");
+  if (ifNoneMatch && ifNoneMatch === object.httpEtag) {
+    return new Response(null, { status: 304, headers });
+  }
 
   return new Response(object.body, { headers });
 }
@@ -212,7 +219,7 @@ async function handlePurge(request, env) {
 
 async function handleEdit(request, env) {
   const body = await request.json();
-  const { clips, output } = body;
+  const { clips, output, force } = body;
 
   if (!clips || !Array.isArray(clips) || clips.length === 0) {
     return Response.json({ error: "No clips provided" }, { status: 400 });
@@ -236,6 +243,14 @@ async function handleEdit(request, env) {
     }
     if (typeof clip.end !== 'number' || (clip.end !== -1 && clip.end <= clip.start)) {
       return Response.json({ error: "Invalid end time for " + clip.key }, { status: 400 });
+    }
+  }
+
+  // Check for existing file unless force overwrite
+  if (!force) {
+    const existing = await env.MEDIA.head(outputKey);
+    if (existing && existing.size > 0) {
+      return Response.json({ error: "exists", key: outputKey }, { status: 409 });
     }
   }
 
@@ -493,7 +508,7 @@ const MANAGE_HTML = `<!DOCTYPE html>
 
   /* Status */
   .status {
-    position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 900;
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 900;
     padding: 9px 20px; border-radius: 6px;
     font-size: 0.84rem; font-family: 'JetBrains Mono', monospace;
     border-left: 3px solid; pointer-events: none; transition: opacity 0.3s; max-width: 90vw;
@@ -889,7 +904,7 @@ const EDITOR_HTML = `<!DOCTYPE html>
   button.btn.primary:hover { background: var(--accent); color: var(--bg); }
   button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 
-  .status { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 900; padding: 9px 20px; border-radius: 6px; font-size: 0.84rem; font-family: 'JetBrains Mono', monospace; border-left: 3px solid; pointer-events: none; transition: opacity 0.3s; max-width: 90vw; }
+  .status { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 900; padding: 9px 20px; border-radius: 6px; font-size: 0.84rem; font-family: 'JetBrains Mono', monospace; border-left: 3px solid; pointer-events: none; transition: opacity 0.3s; max-width: 90vw; }
   .status:empty { display: none; }
   .status.ok { background: rgba(0,240,194,0.15); color: var(--success); border-color: var(--accent); }
   .status.err { background: rgba(248,81,73,0.15); color: var(--danger); border-color: var(--danger); }
@@ -964,7 +979,7 @@ const EDITOR_HTML = `<!DOCTYPE html>
     pointer-events: auto; outline: none;
   }
   .editor-range .range-fill {
-    position: absolute; top: 0; height: 24px; background: var(--accent-dk); border-radius: 12px;
+    position: absolute; top: 0; height: 24px; background: var(--accent-dk); border-radius: 0;
     pointer-events: none;
   }
   .clip-editor .using-label { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--text-dim); text-align: center; }
@@ -1351,7 +1366,7 @@ async function uploadLocalFiles(rawFiles) {
 }
 
 // ── Export ──
-async function doExport() {
+async function doExport(forceOverwrite) {
   if (clips.length === 0) { showStatus("Add at least one clip to the timeline", false); return; }
   var name = document.getElementById("outputName").value.trim();
   if (!name) { showStatus("Enter an output name", false); return; }
@@ -1362,7 +1377,8 @@ async function doExport() {
   var outputKey = "video/" + name + ".webm";
   var payload = {
     clips: clips.map(function(c) { return { key: c.key, start: c.start, end: c.end }; }),
-    output: outputKey
+    output: outputKey,
+    force: !!forceOverwrite
   };
   try {
     showStatus("Dispatching edit job\\u2026", true);
@@ -1374,6 +1390,10 @@ async function doExport() {
     var data = await res.json();
     if (data.ok) {
       showStatus("Edit dispatched! Output: " + data.output + " \\u2014 processing via GitHub Actions", true, 15000);
+    } else if (data.error === "exists") {
+      if (confirm(name + ".webm already exists in video storage.\\nOverwrite it?")) {
+        doExport(true);
+      }
     } else {
       showStatus("Error: " + (data.error || "unknown"), false);
     }

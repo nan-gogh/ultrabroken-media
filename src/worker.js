@@ -1017,7 +1017,7 @@ const EDITOR_HTML = `<!DOCTYPE html>
 
 <div class="section">
   <div class="section-header">
-    <span>R2 Video Library</span>
+    <span>Video Library</span>
     <button class="btn" onclick="loadLibrary()" title="Refresh">&circlearrowright;</button>
   </div>
   <div class="library-list" id="libraryList">

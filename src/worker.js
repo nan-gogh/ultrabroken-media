@@ -103,6 +103,7 @@ async function handleUpload(request, env) {
 
   const formData = await request.formData();
   const prefix = formData.get("prefix") || "";
+  const skipWorkflow = formData.get("skipWorkflow") === "true";
   const results = [];
 
   for (const [fieldName, value] of formData.entries()) {
@@ -124,9 +125,9 @@ async function handleUpload(request, env) {
     const putOptions = {
       httpMetadata: { contentType: value.type || getMime(key) },
     };
-    if (/\.(mp4|mov|mkv)$/i.test(key)) {
+    if (!skipWorkflow && /\.(mp4|mov|mkv)$/i.test(key)) {
       putOptions.customMetadata = { transcode: 'pending' };
-    } else if (/\.(png|jpe?g|webp|bmp|tiff?)$/i.test(key)) {
+    } else if (!skipWorkflow && /\.(png|jpe?g|webp|bmp|tiff?)$/i.test(key)) {
       putOptions.customMetadata = { optimize: 'pending' };
     }
     await env.MEDIA.put(key, value.stream(), putOptions);
@@ -137,7 +138,7 @@ async function handleUpload(request, env) {
   // Dispatch optimization/transcode workflows
   const dispatches = [];
   const videoUploaded = results.some(r => r.ok && /\.(mp4|mov|mkv)$/i.test(r.key));
-  if (videoUploaded && env.GITHUB_TOKEN) {
+  if (!skipWorkflow && videoUploaded && env.GITHUB_TOKEN) {
     const videoKeys = results.filter(r => r.ok && /\.(mp4|mov|mkv)$/i.test(r.key)).map(r => r.key);
     try {
       const resp = await fetch('https://api.github.com/repos/' + (env.GITHUB_REPO || 'nan-gogh/ultrabroken-media') + '/actions/workflows/transcode.yml/dispatches', {
@@ -157,7 +158,7 @@ async function handleUpload(request, env) {
   }
 
   const imageUploaded = results.some(r => r.ok && /\.(png|jpe?g|webp|bmp|tiff?)$/i.test(r.key));
-  if (imageUploaded && env.GITHUB_TOKEN) {
+  if (!skipWorkflow && imageUploaded && env.GITHUB_TOKEN) {
     const imageKeys = results.filter(r => r.ok && /\.(png|jpe?g|webp|bmp|tiff?)$/i.test(r.key)).map(r => r.key);
     try {
       const resp = await fetch('https://api.github.com/repos/' + (env.GITHUB_REPO || 'nan-gogh/ultrabroken-media') + '/actions/workflows/optimize.yml/dispatches', {
@@ -209,7 +210,72 @@ async function handlePurge(request, env) {
   return Response.json({ purged: prefix, deleted });
 }
 
-// â”€â”€ Router â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+async function handleEdit(request, env) {
+  const body = await request.json();
+  const { clips, output } = body;
+
+  if (!clips || !Array.isArray(clips) || clips.length === 0) {
+    return Response.json({ error: "No clips provided" }, { status: 400 });
+  }
+
+  if (!output || typeof output !== 'string') {
+    return Response.json({ error: "No output name provided" }, { status: 400 });
+  }
+
+  const outputKey = output.endsWith('.webm') ? output : output + '.webm';
+  if (!isValidKey(outputKey)) {
+    return Response.json({ error: "Invalid output path" }, { status: 400 });
+  }
+
+  for (const clip of clips) {
+    if (!clip.key || !isValidKey(clip.key)) {
+      return Response.json({ error: "Invalid clip key: " + clip.key }, { status: 400 });
+    }
+    if (typeof clip.start !== 'number' || clip.start < 0) {
+      return Response.json({ error: "Invalid start time for " + clip.key }, { status: 400 });
+    }
+    if (typeof clip.end !== 'number' || (clip.end !== -1 && clip.end <= clip.start)) {
+      return Response.json({ error: "Invalid end time for " + clip.key }, { status: 400 });
+    }
+  }
+
+  // Create placeholder so manage page shows pending badge
+  await env.MEDIA.put(outputKey, new Uint8Array(0), {
+    httpMetadata: { contentType: 'video/webm' },
+    customMetadata: { transcode: 'pending' },
+  });
+
+  if (!env.GITHUB_TOKEN) {
+    return Response.json({ error: "GITHUB_TOKEN not configured" }, { status: 500 });
+  }
+
+  const editPayload = JSON.stringify({ clips, output: outputKey });
+
+  try {
+    const resp = await fetch(
+      'https://api.github.com/repos/' + (env.GITHUB_REPO || 'nan-gogh/ultrabroken-media') + '/actions/workflows/edit.yml/dispatches',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': 'token ' + env.GITHUB_TOKEN,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+          'User-Agent': 'ultrabroken-media-worker',
+        },
+        body: JSON.stringify({ ref: 'main', inputs: { edit: editPayload } }),
+      }
+    );
+
+    if (resp.status !== 204) {
+      const text = await resp.text();
+      return Response.json({ error: "Workflow dispatch failed", status: resp.status, detail: text }, { status: 502 });
+    }
+
+    return Response.json({ ok: true, output: outputKey });
+  } catch (e) {
+    return Response.json({ error: "Dispatch failed: " + e.message }, { status: 502 });
+  }
+}
 
 export default {
   async fetch(request, env) {
@@ -244,6 +310,14 @@ export default {
     }
     if (path === "/manage/api/purge" && request.method === "POST") {
       return handlePurge(request, env);
+    }
+    if (path === "/manage/editor" || path === "/manage/editor/") {
+      return new Response(EDITOR_HTML, {
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
+    if (path === "/manage/api/edit" && request.method === "POST") {
+      return handleEdit(request, env);
     }
 
     // Public file serving
@@ -406,7 +480,10 @@ const MANAGE_HTML = `<!DOCTYPE html>
 
 <header>
   <h1>Ultrabroken Archives <span class="sub">Media Vault</span></h1>
-  <a class="btn" href="/cdn-cgi/access/logout">Logout</a>
+  <div style="display:flex;gap:8px;">
+    <a class="btn" href="/manage/editor">Video Editor</a>
+    <a class="btn" href="/cdn-cgi/access/logout">Logout</a>
+  </div>
 </header>
 
 <div class="tabs">
@@ -657,6 +734,420 @@ loadFiles = async function() {
 
 // â”€â”€ Init â”€â”€
 loadFiles();
+</script>
+</body>
+</html>`;
+
+// ── Inline Video Editor UI ─────────────────────────────────────────
+
+const EDITOR_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ultrabroken Media \u2014 Video Editor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=New+Rocker&family=Texturina:ital,opsz,wght@0,12..44,100..900;1,12..44,100..900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #0f1117;
+    --surface:   #1a1f2e;
+    --surface2:  #222736;
+    --border:    rgba(255,255,255,0.1);
+    --text:      #e0e4ee;
+    --text-dim:  #8b8fa8;
+    --accent:    #00f0c2;
+    --accent-dk: #00796b;
+    --danger:    #f85149;
+    --success:   #00f0c2;
+    --glow:      0 0 12px rgba(0,240,194,0.25);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Texturina', Georgia, serif;
+    background: var(--bg); color: var(--text);
+    max-width: 980px; margin: 0 auto; padding: 32px 20px;
+    background-image: radial-gradient(ellipse at 50% 0%, rgba(0,121,107,0.12) 0%, transparent 60%);
+    min-height: 100vh;
+  }
+  header { margin-bottom: 24px; border-bottom: 1px solid var(--border); padding-bottom: 20px; display: flex; align-items: center; justify-content: space-between; }
+  h1 {
+    font-family: 'New Rocker', serif;
+    font-size: 2rem; font-weight: normal; letter-spacing: 0.04em;
+    color: var(--accent); text-shadow: var(--glow);
+  }
+  h1 .sub { display: block; font-family: 'Texturina', Georgia, serif; font-size: 0.85rem; color: var(--text-dim); font-weight: normal; letter-spacing: 0.01em; margin-top: 2px; }
+
+  button.btn, a.btn {
+    padding: 6px 14px; border-radius: 4px; border: 1px solid var(--border);
+    background: var(--surface2); color: var(--text-dim); cursor: pointer;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.78rem;
+    transition: color 0.15s, border-color 0.15s;
+    text-decoration: none; display: inline-block; line-height: 1.4;
+  }
+  button.btn:hover, a.btn:hover { color: var(--accent); border-color: var(--accent); }
+  button.btn.primary { background: var(--accent-dk); color: var(--text); border-color: var(--accent); }
+  button.btn.primary:hover { background: var(--accent); color: var(--bg); }
+  button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
+
+  .status { padding: 9px 14px; border-radius: 6px; margin-bottom: 14px; font-size: 0.84rem; font-family: 'JetBrains Mono', monospace; border-left: 3px solid; }
+  .status:empty { display: none; }
+  .status.ok { background: rgba(0,240,194,0.07); color: var(--success); border-color: var(--accent); }
+  .status.err { background: rgba(248,81,73,0.08); color: var(--danger); border-color: var(--danger); }
+
+  .section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 18px; overflow: hidden; }
+  .section-header { padding: 10px 16px; border-bottom: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--text-dim); display: flex; align-items: center; justify-content: space-between; }
+
+  .preview { padding: 16px; text-align: center; }
+  .preview video { max-width: 100%; max-height: 320px; border-radius: 6px; background: #000; }
+  .preview .placeholder { padding: 60px; color: var(--text-dim); font-size: 0.85rem; }
+
+  .library-list { max-height: 220px; overflow-y: auto; }
+  .library-row { display: flex; align-items: center; padding: 7px 16px; gap: 10px; border-bottom: 1px solid var(--border); font-size: 0.78rem; }
+  .library-row:last-child { border-bottom: none; }
+  .library-row:hover { background: var(--surface2); }
+  .library-row .name { flex: 1; font-family: 'JetBrains Mono', monospace; word-break: break-all; cursor: pointer; }
+  .library-row .name:hover { color: var(--accent); }
+  .library-row .size { color: var(--text-dim); font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; min-width: 60px; text-align: right; }
+
+  .mini-upload { padding: 14px 16px; border-top: 1px solid var(--border); text-align: center; cursor: pointer; color: var(--text-dim); font-size: 0.78rem; transition: color 0.15s; }
+  .mini-upload:hover { color: var(--accent); }
+  .mini-upload.dragover { background: rgba(0,240,194,0.05); color: var(--accent); }
+
+  .timeline { padding: 16px; min-height: 80px; display: flex; gap: 10px; overflow-x: auto; flex-wrap: wrap; }
+  .timeline:empty::after { content: 'Add clips from the library above'; color: var(--text-dim); font-size: 0.82rem; width: 100%; text-align: center; padding: 20px; }
+
+  .clip-card {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px 12px; min-width: 180px; max-width: 220px; flex-shrink: 0;
+    cursor: grab; user-select: none; transition: border-color 0.15s, transform 0.15s;
+  }
+  .clip-card:active { cursor: grabbing; }
+  .clip-card.dragging { opacity: 0.4; transform: scale(0.95); }
+  .clip-card.dragover { border-color: var(--accent); border-style: dashed; }
+  .clip-card .clip-name { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--text); margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .clip-card .clip-times { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+  .clip-card input[type="number"] {
+    width: 62px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px;
+    color: var(--text); padding: 3px 6px; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
+    text-align: center;
+  }
+  .clip-card input[type="number"]:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+  .clip-card .clip-dur { font-size: 0.68rem; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
+  .clip-card .clip-actions { display: flex; gap: 4px; margin-top: 6px; }
+  .clip-card .clip-actions button { padding: 2px 8px; font-size: 0.7rem; }
+
+  .export-bar { padding: 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .export-bar label { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--text-dim); }
+  .export-bar input[type="text"] {
+    flex: 1; min-width: 180px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+    color: var(--text); padding: 7px 12px; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem;
+  }
+  .export-bar input[type="text"]:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+  .export-bar .suffix { font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; color: var(--text-dim); }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--accent-dk); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Ultrabroken Archives <span class="sub">Video Editor</span></h1>
+  <a class="btn" href="/manage">&larr; Back to Manage</a>
+</header>
+
+<div id="status"></div>
+
+<div class="section">
+  <div class="section-header">Preview</div>
+  <div class="preview" id="previewBox">
+    <div class="placeholder">Select a clip to preview</div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header">
+    <span>R2 Video Library</span>
+    <button class="btn" onclick="loadLibrary()" title="Refresh">&circlearrowright;</button>
+  </div>
+  <div class="library-list" id="libraryList">
+    <div style="padding:20px;text-align:center;color:var(--text-dim);font-size:0.82rem;">Loading\u2026</div>
+  </div>
+  <div class="mini-upload" id="miniUpload">
+    <strong>+ Upload local file</strong> (or drag here)
+    <input type="file" id="localFileInput" multiple hidden accept="video/*">
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header">Timeline <span id="clipCount" style="margin-left:auto;"></span></div>
+  <div class="timeline" id="timeline"></div>
+</div>
+
+<div class="section">
+  <div class="section-header">Export</div>
+  <div class="export-bar">
+    <label>Output:</label>
+    <span class="suffix">video/</span>
+    <input type="text" id="outputName" placeholder="my-edit" spellcheck="false">
+    <span class="suffix">.webm</span>
+    <button class="btn primary" onclick="doExport()">Export &rarr; AV1+Opus</button>
+  </div>
+</div>
+
+<script>
+var API = "/manage/api";
+var BASE_URL = location.origin + "/";
+var clips = [];
+var nextClipId = 1;
+var dragSrcIndex = null;
+
+// ── Status ──
+var statusTimer = null;
+function showStatus(msg, ok, dur) {
+  var el = document.getElementById("status");
+  el.className = "status " + (ok ? "ok" : "err");
+  el.textContent = msg;
+  if (statusTimer) clearTimeout(statusTimer);
+  statusTimer = setTimeout(function() { el.textContent = ""; el.className = "status"; }, dur || 8000);
+}
+
+// ── Library ──
+async function loadLibrary() {
+  var container = document.getElementById("libraryList");
+  container.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text-dim);font-size:0.82rem;">Loading\\u2026</div>';
+  try {
+    var allFiles = [];
+    var cursor = null;
+    do {
+      var params = new URLSearchParams({ prefix: "video/" });
+      if (cursor) params.set("cursor", cursor);
+      var res = await fetch(API + "/list?" + params);
+      var data = await res.json();
+      allFiles = allFiles.concat(data.files);
+      cursor = data.truncated ? data.cursor : null;
+    } while (cursor);
+
+    allFiles = allFiles.filter(function(f) { return f.size > 0; });
+
+    if (allFiles.length === 0) {
+      container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-dim);font-size:0.82rem;">No videos in R2</div>';
+      return;
+    }
+
+    var html = "";
+    for (var i = 0; i < allFiles.length; i++) {
+      var f = allFiles[i];
+      var name = f.key.replace(/^video\\//, "");
+      var size = formatSize(f.size);
+      var badge = f.transcode === "pending" ? ' <span style="color:#ffaa32;font-size:0.68rem;">\\u23F3</span>' : "";
+      html += '<div class="library-row">'
+        + '<span class="name" onclick="previewClip(\\'' + escAttr(f.key) + '\\')" title="Click to preview">' + escHtml(name) + badge + '</span>'
+        + '<span class="size">' + size + '</span>'
+        + '<button class="btn" onclick="addClip(\\'' + escAttr(f.key) + '\\')">+</button>'
+        + '</div>';
+    }
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--danger);font-size:0.82rem;">Error loading library</div>';
+  }
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+}
+
+function escHtml(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+function escAttr(s) { return s.replace(/'/g, "\\\\'").replace(/"/g, "&quot;"); }
+
+// ── Preview ──
+function previewClip(key, startTime) {
+  var box = document.getElementById("previewBox");
+  var url = BASE_URL + key;
+  var t = startTime || 0;
+  box.innerHTML = '<video controls preload="metadata" src="' + url + '#t=' + t + '"></video>';
+}
+
+// ── Timeline ──
+async function addClip(key) {
+  var name = key.replace(/^video\\//, "");
+  var dur = await getVideoDuration(BASE_URL + key);
+  clips.push({ id: nextClipId++, key: key, name: name, start: 0, end: dur || -1, duration: dur || 0 });
+  renderTimeline();
+  showStatus("Added: " + name, true, 3000);
+}
+
+function getVideoDuration(url) {
+  return new Promise(function(resolve) {
+    var v = document.createElement("video");
+    v.preload = "metadata";
+    v.onloadedmetadata = function() { resolve(Math.round(v.duration * 100) / 100); };
+    v.onerror = function() { resolve(0); };
+    v.src = url;
+  });
+}
+
+function renderTimeline() {
+  var tl = document.getElementById("timeline");
+  var html = "";
+  for (var i = 0; i < clips.length; i++) {
+    var c = clips[i];
+    var durText = c.duration > 0 ? c.duration.toFixed(1) + "s total" : "?";
+    var trimDur = "";
+    if (c.duration > 0) {
+      var endVal = (c.end === -1 || c.end > c.duration) ? c.duration : c.end;
+      trimDur = (endVal - c.start).toFixed(1) + "s";
+    }
+    html += '<div class="clip-card" draggable="true" data-index="' + i + '" '
+      + 'ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)">'
+      + '<div class="clip-name" title="' + escHtml(c.key) + '">' + escHtml(c.name) + '</div>'
+      + '<div class="clip-times">'
+      + '<input type="number" min="0" step="0.1" value="' + c.start + '" onchange="updateClipStart(' + i + ', this.value)" title="Start (seconds)">'
+      + '<span style="color:var(--text-dim);font-size:0.75rem;">&rarr;</span>'
+      + '<input type="number" min="-1" step="0.1" value="' + (c.end === -1 ? -1 : c.end) + '" onchange="updateClipEnd(' + i + ', this.value)" title="End (seconds, -1 = full)">'
+      + '</div>'
+      + '<div class="clip-dur">' + durText + (trimDur ? " &bull; using " + trimDur : "") + '</div>'
+      + '<div class="clip-actions">'
+      + '<button class="btn" onclick="previewClip(\\'' + escAttr(c.key) + '\\', ' + c.start + ')">Preview</button>'
+      + '<button class="btn danger" onclick="removeClip(' + i + ')">&times;</button>'
+      + '</div></div>';
+  }
+  tl.innerHTML = html;
+  document.getElementById("clipCount").textContent = clips.length > 0 ? clips.length + " clip(s)" : "";
+}
+
+function updateClipStart(i, val) {
+  var v = parseFloat(val);
+  if (isNaN(v) || v < 0) v = 0;
+  clips[i].start = v;
+  renderTimeline();
+}
+
+function updateClipEnd(i, val) {
+  var v = parseFloat(val);
+  if (isNaN(v) || v < -1) v = -1;
+  if (v === 0) v = -1;
+  clips[i].end = v;
+  renderTimeline();
+}
+
+function removeClip(i) {
+  clips.splice(i, 1);
+  renderTimeline();
+}
+
+// ── Drag to reorder ──
+function onDragStart(e) {
+  dragSrcIndex = parseInt(e.target.getAttribute("data-index"));
+  e.target.classList.add("dragging");
+  e.dataTransfer.effectAllowed = "move";
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "move";
+  var card = e.target.closest(".clip-card");
+  if (card) {
+    document.querySelectorAll(".clip-card").forEach(function(c) { c.classList.remove("dragover"); });
+    card.classList.add("dragover");
+  }
+}
+
+function onDrop(e) {
+  e.preventDefault();
+  var card = e.target.closest(".clip-card");
+  if (!card) return;
+  var targetIndex = parseInt(card.getAttribute("data-index"));
+  if (dragSrcIndex === null || dragSrcIndex === targetIndex) return;
+  var moved = clips.splice(dragSrcIndex, 1)[0];
+  clips.splice(targetIndex, 0, moved);
+  renderTimeline();
+}
+
+function onDragEnd(e) {
+  dragSrcIndex = null;
+  document.querySelectorAll(".clip-card").forEach(function(c) {
+    c.classList.remove("dragging", "dragover");
+  });
+}
+
+// ── Local upload ──
+var miniUploadEl = document.getElementById("miniUpload");
+var localFileInput = document.getElementById("localFileInput");
+miniUploadEl.addEventListener("click", function(e) {
+  if (e.target === localFileInput) return;
+  localFileInput.click();
+});
+miniUploadEl.addEventListener("dragover", function(e) { e.preventDefault(); miniUploadEl.classList.add("dragover"); });
+miniUploadEl.addEventListener("dragleave", function() { miniUploadEl.classList.remove("dragover"); });
+miniUploadEl.addEventListener("drop", function(e) {
+  e.preventDefault();
+  miniUploadEl.classList.remove("dragover");
+  uploadLocalFiles(e.dataTransfer.files);
+});
+localFileInput.addEventListener("change", function() { uploadLocalFiles(localFileInput.files); });
+
+async function uploadLocalFiles(rawFiles) {
+  if (!rawFiles.length) return;
+  var files = Array.from(rawFiles).filter(function(f) { return f.type.startsWith("video/"); });
+  if (files.length === 0) { showStatus("Only video files accepted", false); return; }
+  var form = new FormData();
+  form.set("prefix", "video/");
+  form.set("skipWorkflow", "true");
+  for (var i = 0; i < files.length; i++) form.append("file", files[i]);
+  try {
+    showStatus("Uploading " + files.length + " file(s)\\u2026", true);
+    var res = await fetch(API + "/upload", { method: "POST", body: form });
+    var data = await res.json();
+    var ok = data.results.filter(function(r) { return r.ok; }).length;
+    showStatus(ok + " file(s) uploaded to R2", true, 5000);
+    loadLibrary();
+  } catch (e) {
+    showStatus("Upload failed: " + e.message, false);
+  }
+  localFileInput.value = "";
+}
+
+// ── Export ──
+async function doExport() {
+  if (clips.length === 0) { showStatus("Add at least one clip to the timeline", false); return; }
+  var name = document.getElementById("outputName").value.trim();
+  if (!name) { showStatus("Enter an output name", false); return; }
+  if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+    showStatus("Name: letters, numbers, dashes, underscores only", false);
+    return;
+  }
+  var outputKey = "video/" + name + ".webm";
+  var payload = {
+    clips: clips.map(function(c) { return { key: c.key, start: c.start, end: c.end }; }),
+    output: outputKey
+  };
+  try {
+    showStatus("Dispatching edit job\\u2026", true);
+    var res = await fetch(API + "/edit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    var data = await res.json();
+    if (data.ok) {
+      showStatus("Edit dispatched! Output: " + data.output + " \\u2014 processing via GitHub Actions", true, 15000);
+    } else {
+      showStatus("Error: " + (data.error || "unknown"), false);
+    }
+  } catch (e) {
+    showStatus("Export failed: " + e.message, false);
+  }
+}
+
+// ── Init ──
+loadLibrary();
 </script>
 </body>
 </html>`;

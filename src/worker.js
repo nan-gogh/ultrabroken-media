@@ -277,6 +277,38 @@ async function handleEdit(request, env) {
   }
 }
 
+async function handleRename(request, env) {
+  const { key, newKey } = await request.json();
+
+  if (!isValidKey(key)) {
+    return Response.json({ error: "Invalid source key" }, { status: 400 });
+  }
+  if (!isValidKey(newKey)) {
+    return Response.json({ error: "Invalid destination key" }, { status: 400 });
+  }
+  if (key === newKey) {
+    return Response.json({ error: "Source and destination are the same" }, { status: 400 });
+  }
+
+  const existing = await env.MEDIA.get(newKey);
+  if (existing) {
+    return Response.json({ error: "A file with that name already exists" }, { status: 409 });
+  }
+
+  const source = await env.MEDIA.get(key);
+  if (!source) {
+    return Response.json({ error: "Source file not found" }, { status: 404 });
+  }
+
+  await env.MEDIA.put(newKey, source.body, {
+    httpMetadata: source.httpMetadata,
+    customMetadata: source.customMetadata,
+  });
+  await env.MEDIA.delete(key);
+
+  return Response.json({ renamed: newKey });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -318,6 +350,9 @@ export default {
     }
     if (path === "/manage/api/edit" && request.method === "POST") {
       return handleEdit(request, env);
+    }
+    if (path === "/manage/api/rename" && request.method === "POST") {
+      return handleRename(request, env);
     }
 
     // Public file serving
@@ -458,16 +493,32 @@ const MANAGE_HTML = `<!DOCTYPE html>
 
   /* Status */
   .status {
-    padding: 9px 14px; border-radius: 6px; margin-bottom: 14px;
+    position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 900;
+    padding: 9px 20px; border-radius: 6px;
     font-size: 0.84rem; font-family: 'JetBrains Mono', monospace;
-    border-left: 3px solid;
+    border-left: 3px solid; pointer-events: none; transition: opacity 0.3s; max-width: 90vw;
   }
   .status:empty { display: none; }
-  .status.ok  { background: rgba(0,240,194,0.07); color: var(--success); border-color: var(--accent); }
-  .status.err { background: rgba(248,81,73,0.08); color: var(--danger);  border-color: var(--danger); }
+  .status.ok  { background: rgba(0,240,194,0.15); color: var(--success); border-color: var(--accent); }
+  .status.err { background: rgba(248,81,73,0.15); color: var(--danger);  border-color: var(--danger); }
 
   .empty   { padding: 48px; text-align: center; color: var(--text-dim); font-size: 0.9rem; }
   .loading { padding: 24px; text-align: center; color: var(--text-dim); font-size: 0.85rem; }
+
+  /* Preview modal */
+  .preview-overlay {
+    position: fixed; inset: 0; z-index: 800; background: rgba(0,0,0,0.8);
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .preview-overlay img, .preview-overlay video {
+    max-width: 90vw; max-height: 85vh; border-radius: 8px; background: #000; cursor: default;
+  }
+  .preview-overlay .close-btn {
+    position: absolute; top: 12px; right: 18px; color: var(--text);
+    font-size: 1.8rem; cursor: pointer; line-height: 1; background: none; border: none;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .preview-overlay .close-btn:hover { color: var(--accent); }
 
   /* Scrollbar */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -582,8 +633,10 @@ async function loadFiles() {
         + '<span class="size">' + size + '</span>'
         + '<span class="date">' + date + '</span>'
         + '<span class="actions">'
+        + '  <button class="btn" onclick="previewFile(\\'' + escAttr(f.key) + '\\')">Preview</button>'
         + '  <a class="btn" href="/' + encodeURI(f.key) + '" download title="Download">&#8595;</a>'
         + '  <button class="btn" onclick="copyUrl(\\'' + escAttr(f.key) + '\\')">Copy URL</button>'
+        + '  <button class="btn" onclick="renameFile(\\'' + escAttr(f.key) + '\\')">Rename</button>'
         + '  <button class="btn danger" onclick="deleteFile(\\'' + escAttr(f.key) + '\\')">Delete</button>'
         + '</span></div>';
     }
@@ -706,6 +759,51 @@ async function purgePrefix() {
 }
 
 // â”€â”€ Auto-refresh for pending transcodes â”€â”€
+// -- Preview --
+function previewFile(key) {
+  var url = location.origin + '/' + key;
+  var isVideo = /\.(mp4|mov|webm|mkv)$/i.test(key);
+  var overlay = document.createElement('div');
+  overlay.className = 'preview-overlay';
+  overlay.onclick = function(e) { if (e.target === overlay) document.body.removeChild(overlay); };
+  var close = document.createElement('button');
+  close.className = 'close-btn';
+  close.innerHTML = '&times;';
+  close.onclick = function() { document.body.removeChild(overlay); };
+  overlay.appendChild(close);
+  if (isVideo) {
+    var vid = document.createElement('video');
+    vid.controls = true; vid.autoplay = true; vid.src = url;
+    overlay.appendChild(vid);
+  } else {
+    var img = document.createElement('img');
+    img.src = url; img.alt = key;
+    overlay.appendChild(img);
+  }
+  document.body.appendChild(overlay);
+}
+
+// -- Rename --
+async function renameFile(key) {
+  var prefix = key.substring(0, key.indexOf('/') + 1);
+  var oldName = key.slice(prefix.length);
+  var newName = prompt('Rename file:\n' + oldName, oldName);
+  if (!newName || newName === oldName) return;
+  try {
+    showStatus('Renaming...', true);
+    var res = await fetch(API + '/rename', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: key, newKey: prefix + newName }),
+    });
+    var data = await res.json();
+    if (data.renamed) { showStatus('Renamed to ' + data.renamed, true); loadFiles(); }
+    else showStatus('Rename failed: ' + (data.error || 'unknown'), false);
+  } catch (e) {
+    showStatus('Rename failed: ' + e.message, false);
+  }
+}
+
 let refreshTimer = null;
 let refreshCount = 0;
 const MAX_REFRESHES = 30; // stop after ~5 min
@@ -791,10 +889,10 @@ const EDITOR_HTML = `<!DOCTYPE html>
   button.btn.primary:hover { background: var(--accent); color: var(--bg); }
   button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 
-  .status { padding: 9px 14px; border-radius: 6px; margin-bottom: 14px; font-size: 0.84rem; font-family: 'JetBrains Mono', monospace; border-left: 3px solid; }
+  .status { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 900; padding: 9px 20px; border-radius: 6px; font-size: 0.84rem; font-family: 'JetBrains Mono', monospace; border-left: 3px solid; pointer-events: none; transition: opacity 0.3s; max-width: 90vw; }
   .status:empty { display: none; }
-  .status.ok { background: rgba(0,240,194,0.07); color: var(--success); border-color: var(--accent); }
-  .status.err { background: rgba(248,81,73,0.08); color: var(--danger); border-color: var(--danger); }
+  .status.ok { background: rgba(0,240,194,0.15); color: var(--success); border-color: var(--accent); }
+  .status.err { background: rgba(248,81,73,0.15); color: var(--danger); border-color: var(--danger); }
 
   .section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 18px; overflow: hidden; }
   .section-header { padding: 10px 16px; border-bottom: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--text-dim); display: flex; align-items: center; justify-content: space-between; }
@@ -1089,7 +1187,7 @@ function renderEditor() {
     + '<input type="number" min="0" step="0.1" value="' + endVal.toFixed(1) + '" onchange="onNumIn(1,this.value)" title="End">'
     + '</div>'
     + '<div class="editor-range">'
-    + '<div class="range-fill" style="left:' + startPct + '%;right:' + (100 - endPct) + '%;"></div>'
+    + '<div class="range-fill" style="left:calc(' + (c.start / maxVal) + ' * (100% - 24px) + 12px);right:calc(' + (1 - endVal / maxVal) + ' * (100% - 24px) + 12px);"></div>'
     + '<input type="range" min="0" max="' + maxVal + '" step="0.1" value="' + c.start + '" oninput="onEditorRange(0,this.value)">'
     + '<input type="range" min="0" max="' + maxVal + '" step="0.1" value="' + endVal + '" oninput="onEditorRange(1,this.value)">'
     + '</div>'
@@ -1148,7 +1246,7 @@ function patchEditor(c, maxVal) {
   var endPct = (endVal / maxVal * 100).toFixed(1);
   var panel = document.getElementById("clipEditor");
   var fill = panel.querySelector('.range-fill');
-  if (fill) { fill.style.left = startPct + '%'; fill.style.right = (100 - endPct) + '%'; }
+  if (fill) { fill.style.left = 'calc(' + (c.start / maxVal) + ' * (100% - 24px) + 12px)'; fill.style.right = 'calc(' + (1 - endVal / maxVal) + ' * (100% - 24px) + 12px)'; }
   var times = panel.querySelectorAll('.editor-times input[type="number"]');
   if (times[0]) times[0].value = c.start;
   if (times[1]) times[1].value = endVal.toFixed(1);

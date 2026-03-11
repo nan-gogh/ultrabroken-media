@@ -762,7 +762,7 @@ async function purgePrefix() {
 // -- Preview --
 function previewFile(key) {
   var url = location.origin + '/' + key;
-  var isVideo = /\.(mp4|mov|webm|mkv)$/i.test(key);
+  var isVideo = /\\.(mp4|mov|webm|mkv)$/i.test(key);
   var overlay = document.createElement('div');
   overlay.className = 'preview-overlay';
   overlay.onclick = function(e) { if (e.target === overlay) document.body.removeChild(overlay); };
@@ -787,7 +787,7 @@ function previewFile(key) {
 async function renameFile(key) {
   var prefix = key.substring(0, key.indexOf('/') + 1);
   var oldName = key.slice(prefix.length);
-  var newName = prompt('Rename file:\n' + oldName, oldName);
+  var newName = prompt('Rename file:\\n' + oldName, oldName);
   if (!newName || newName === oldName) return;
   try {
     showStatus('Renaming...', true);
@@ -948,19 +948,20 @@ const EDITOR_HTML = `<!DOCTYPE html>
   .editor-range { position: relative; width: 100%; height: 24px; border-radius: 12px; background: var(--bg); margin-bottom: 4px; }
   .editor-range input[type="range"] {
     position: absolute; top: 0; left: 0; width: 100%; height: 24px;
-    -webkit-appearance: none; appearance: none; background: none; pointer-events: none; margin: 0;
+    -webkit-appearance: none; appearance: none; background: none; pointer-events: none; margin: 0; outline: none;
   }
+  .editor-range input[type="range"]:focus { outline: none; box-shadow: none; }
   .editor-range input[type="range"]::-webkit-slider-runnable-track { height: 24px; background: transparent; border-radius: 12px; }
   .editor-range input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%;
     background: var(--accent); border: 3px solid var(--bg); cursor: pointer;
-    pointer-events: auto; margin-top: 0; position: relative; z-index: 2;
+    pointer-events: auto; margin-top: 0; position: relative; z-index: 2; outline: none;
   }
   .editor-range input[type="range"]::-moz-range-track { height: 24px; background: transparent; border-radius: 12px; border: none; }
   .editor-range input[type="range"]::-moz-range-thumb {
     width: 24px; height: 24px; border-radius: 50%;
     background: var(--accent); border: 3px solid var(--bg); cursor: pointer;
-    pointer-events: auto;
+    pointer-events: auto; outline: none;
   }
   .editor-range .range-fill {
     position: absolute; top: 0; height: 24px; background: var(--accent-dk); border-radius: 12px;

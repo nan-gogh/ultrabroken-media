@@ -815,43 +815,60 @@ const EDITOR_HTML = `<!DOCTYPE html>
   .mini-upload:hover { color: var(--accent); }
   .mini-upload.dragover { background: rgba(0,240,194,0.05); color: var(--accent); }
 
-  .timeline { padding: 16px; min-height: 80px; display: flex; gap: 10px; overflow-x: auto; flex-wrap: wrap; }
+  .timeline { padding: 12px; min-height: 60px; display: flex; gap: 8px; overflow-x: auto; flex-wrap: wrap; }
   .timeline:empty::after { content: 'Add clips from the library above'; color: var(--text-dim); font-size: 0.82rem; width: 100%; text-align: center; padding: 20px; }
 
   .clip-card {
     background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
-    padding: 10px 12px; min-width: 210px; max-width: 260px; flex-shrink: 0;
+    padding: 8px 10px; min-width: 120px; max-width: 170px; flex-shrink: 0;
     cursor: grab; user-select: none; transition: border-color 0.15s, transform 0.15s;
   }
   .clip-card:active { cursor: grabbing; }
+  .clip-card.selected { border-color: var(--accent); box-shadow: var(--glow); }
   .clip-card.dragging { opacity: 0.4; transform: scale(0.95); }
   .clip-card.dragover { border-color: var(--accent); border-style: dashed; }
-  .clip-card .clip-name { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--text); margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .clip-card .clip-times { display: flex; gap: 6px; align-items: center; justify-content: space-between; margin-bottom: 2px; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: var(--text-dim); }
-  .range-wrap { position: relative; width: 100%; height: 14px; margin-bottom: 6px; border-radius: 7px; background: var(--bg); overflow: visible; }
-  .range-wrap input[type="range"] {
-    position: absolute; top: 0; left: 0; width: 100%; height: 14px;
+  .clip-card .clip-name { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--text); margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .clip-card .clip-mini-bar { position: relative; width: 100%; height: 6px; border-radius: 3px; background: var(--bg); margin-bottom: 4px; }
+  .clip-card .clip-mini-fill { position: absolute; top: 0; height: 6px; border-radius: 3px; background: var(--accent-dk); }
+  .clip-card .clip-meta { font-size: 0.65rem; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; margin-bottom: 4px; }
+  .clip-card .clip-actions { display: flex; gap: 4px; }
+  .clip-card .clip-actions button { padding: 2px 8px; font-size: 0.7rem; }
+
+  /* Global clip editor panel */
+  .clip-editor { padding: 16px; }
+  .clip-editor .empty-msg { text-align: center; padding: 12px; color: var(--text-dim); font-size: 0.82rem; }
+  .clip-editor .editor-info { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+  .clip-editor .editor-name { font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; color: var(--accent); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .clip-editor .editor-dur { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-dim); }
+  .clip-editor .editor-times { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--text-dim); }
+  .clip-editor .editor-times input[type="number"] {
+    width: 68px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px;
+    color: var(--text); padding: 3px 6px; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
+    text-align: center;
+  }
+  .clip-editor .editor-times input[type="number"]:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+  .editor-range { position: relative; width: 100%; height: 24px; border-radius: 12px; background: var(--bg); margin-bottom: 4px; }
+  .editor-range input[type="range"] {
+    position: absolute; top: 0; left: 0; width: 100%; height: 24px;
     -webkit-appearance: none; appearance: none; background: none; pointer-events: none; margin: 0;
   }
-  .range-wrap input[type="range"]::-webkit-slider-runnable-track { height: 14px; background: transparent; border-radius: 7px; }
-  .range-wrap input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
-    background: var(--accent); border: 2px solid var(--bg); cursor: pointer;
+  .editor-range input[type="range"]::-webkit-slider-runnable-track { height: 24px; background: transparent; border-radius: 12px; }
+  .editor-range input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--accent); border: 3px solid var(--bg); cursor: pointer;
     pointer-events: auto; margin-top: 0; position: relative; z-index: 2;
   }
-  .range-wrap input[type="range"]::-moz-range-track { height: 14px; background: transparent; border-radius: 7px; border: none; }
-  .range-wrap input[type="range"]::-moz-range-thumb {
-    width: 14px; height: 14px; border-radius: 50%;
-    background: var(--accent); border: 2px solid var(--bg); cursor: pointer;
+  .editor-range input[type="range"]::-moz-range-track { height: 24px; background: transparent; border-radius: 12px; border: none; }
+  .editor-range input[type="range"]::-moz-range-thumb {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--accent); border: 3px solid var(--bg); cursor: pointer;
     pointer-events: auto;
   }
-  .range-wrap .range-fill {
-    position: absolute; top: 0; height: 14px; background: var(--accent-dk); border-radius: 7px;
+  .editor-range .range-fill {
+    position: absolute; top: 0; height: 24px; background: var(--accent-dk); border-radius: 12px;
     pointer-events: none;
   }
-  .clip-card .clip-dur { font-size: 0.68rem; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
-  .clip-card .clip-actions { display: flex; gap: 4px; margin-top: 6px; }
-  .clip-card .clip-actions button { padding: 2px 8px; font-size: 0.7rem; }
+  .clip-editor .using-label { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--text-dim); text-align: center; }
 
   .export-bar { padding: 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .export-bar label { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--text-dim); }
@@ -899,6 +916,13 @@ const EDITOR_HTML = `<!DOCTYPE html>
 </div>
 
 <div class="section">
+  <div class="section-header">Clip Editor</div>
+  <div class="clip-editor" id="clipEditor">
+    <div class="empty-msg">Select a clip from the timeline to edit its range</div>
+  </div>
+</div>
+
+<div class="section">
   <div class="section-header">Timeline <span id="clipCount" style="margin-left:auto;"></span></div>
   <div class="timeline" id="timeline"></div>
 </div>
@@ -920,6 +944,7 @@ var BASE_URL = location.origin + "/";
 var clips = [];
 var nextClipId = 1;
 var dragSrcIndex = null;
+var selectedIndex = -1;
 
 // ── Status ──
 var statusTimer = null;
@@ -994,7 +1019,9 @@ async function addClip(key) {
   var name = key.replace(/^video\\//, "");
   var dur = await getVideoDuration(BASE_URL + key);
   clips.push({ id: nextClipId++, key: key, name: name, start: 0, end: dur || -1, duration: dur || 0 });
+  selectedIndex = clips.length - 1;
   renderTimeline();
+  renderEditor();
   showStatus("Added: " + name, true, 3000);
 }
 
@@ -1013,29 +1040,60 @@ function renderTimeline() {
   var html = "";
   for (var i = 0; i < clips.length; i++) {
     var c = clips[i];
-    var durText = c.duration > 0 ? c.duration.toFixed(1) + "s total" : "?";
     var maxVal = c.duration > 0 ? c.duration : 100;
     var endVal = (c.end === -1 || c.end > maxVal) ? maxVal : c.end;
-    var trimDur = c.duration > 0 ? (endVal - c.start).toFixed(1) + "s" : "";
     var startPct = (c.start / maxVal * 100).toFixed(1);
-    var endPct = (endVal / maxVal * 100).toFixed(1);
-    html += '<div class="clip-card" draggable="true" data-index="' + i + '" '
+    var widthPct = ((endVal - c.start) / maxVal * 100).toFixed(1);
+    var trimDur = c.duration > 0 ? (endVal - c.start).toFixed(1) + "s" : "";
+    var sel = i === selectedIndex ? " selected" : "";
+    html += '<div class="clip-card' + sel + '" draggable="true" data-index="' + i + '" '
+      + 'onclick="selectClip(' + i + ')" '
       + 'ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)">'
       + '<div class="clip-name" title="' + escHtml(c.key) + '">' + escHtml(c.name) + '</div>'
-      + '<div class="clip-times"><span>' + fmtTime(c.start) + '</span><span>' + fmtTime(endVal) + '</span></div>'
-      + '<div class="range-wrap">'
-      + '<div class="range-fill" style="left:' + startPct + '%;right:' + (100 - endPct) + '%;"></div>'
-      + '<input type="range" min="0" max="' + maxVal + '" step="0.1" value="' + c.start + '" oninput="onRangeIn(' + i + ',0,this.value)" onmousedown="lockDrag(this)" ontouchstart="lockDrag(this)">'
-      + '<input type="range" min="0" max="' + maxVal + '" step="0.1" value="' + endVal + '" oninput="onRangeIn(' + i + ',1,this.value)" onmousedown="lockDrag(this)" ontouchstart="lockDrag(this)">'
-      + '</div>'
-      + '<div class="clip-dur">' + durText + (trimDur ? " &bull; using " + trimDur : "") + '</div>'
+      + '<div class="clip-mini-bar"><div class="clip-mini-fill" style="left:' + startPct + '%;width:' + widthPct + '%;"></div></div>'
+      + '<div class="clip-meta">' + (trimDur || "?") + '</div>'
       + '<div class="clip-actions">'
-      + '<button class="btn" onclick="previewClip(\\'' + escAttr(c.key) + '\\', ' + c.start + ')">Preview</button>'
-      + '<button class="btn danger" onclick="removeClip(' + i + ')">&times;</button>'
+      + '<button class="btn" onclick="event.stopPropagation();previewClip(\\'' + escAttr(c.key) + '\\', ' + c.start + ')">Preview</button>'
+      + '<button class="btn danger" onclick="event.stopPropagation();removeClip(' + i + ')">&times;</button>'
       + '</div></div>';
   }
   tl.innerHTML = html;
   document.getElementById("clipCount").textContent = clips.length > 0 ? clips.length + " clip(s)" : "";
+}
+
+function selectClip(i) {
+  selectedIndex = i;
+  renderTimeline();
+  renderEditor();
+}
+
+function renderEditor() {
+  var panel = document.getElementById("clipEditor");
+  if (selectedIndex < 0 || selectedIndex >= clips.length) {
+    panel.innerHTML = '<div class="empty-msg">Select a clip from the timeline to edit its range</div>';
+    return;
+  }
+  var c = clips[selectedIndex];
+  var maxVal = c.duration > 0 ? c.duration : 100;
+  var endVal = (c.end === -1 || c.end > maxVal) ? maxVal : c.end;
+  var startPct = (c.start / maxVal * 100).toFixed(1);
+  var endPct = (endVal / maxVal * 100).toFixed(1);
+  var trimDur = c.duration > 0 ? (endVal - c.start).toFixed(1) + "s" : "";
+  var durText = c.duration > 0 ? c.duration.toFixed(1) + "s total" : "?";
+  panel.innerHTML = '<div class="editor-info">'
+    + '<span class="editor-name" title="' + escHtml(c.key) + '">' + escHtml(c.name) + '</span>'
+    + '<span class="editor-dur">' + durText + '</span></div>'
+    + '<div class="editor-times">'
+    + '<input type="number" min="0" step="0.1" value="' + c.start + '" onchange="onNumIn(0,this.value)" title="Start">'
+    + '<span>&rarr;</span>'
+    + '<input type="number" min="0" step="0.1" value="' + endVal.toFixed(1) + '" onchange="onNumIn(1,this.value)" title="End">'
+    + '</div>'
+    + '<div class="editor-range">'
+    + '<div class="range-fill" style="left:' + startPct + '%;right:' + (100 - endPct) + '%;"></div>'
+    + '<input type="range" min="0" max="' + maxVal + '" step="0.1" value="' + c.start + '" oninput="onEditorRange(0,this.value)">'
+    + '<input type="range" min="0" max="' + maxVal + '" step="0.1" value="' + endVal + '" oninput="onEditorRange(1,this.value)">'
+    + '</div>'
+    + '<div class="using-label">Using ' + (trimDur || "?") + '</div>';
 }
 
 function fmtTime(s) {
@@ -1044,27 +1102,11 @@ function fmtTime(s) {
   return m > 0 ? m + ':' + (sec < 10 ? '0' : '') + sec : sec + 's';
 }
 
-function lockDrag(input) {
-  var card = input.closest('.clip-card');
-  if (!card) return;
-  card.setAttribute('draggable', 'false');
-  function unlock() {
-    card.setAttribute('draggable', 'true');
-    input.removeEventListener('mouseup', unlock);
-    input.removeEventListener('touchend', unlock);
-    document.removeEventListener('mouseup', unlock);
-    document.removeEventListener('touchend', unlock);
-  }
-  input.addEventListener('mouseup', unlock);
-  input.addEventListener('touchend', unlock);
-  document.addEventListener('mouseup', unlock);
-  document.addEventListener('touchend', unlock);
-}
-
-function onRangeIn(i, handle, val) {
+function onEditorRange(handle, val) {
+  if (selectedIndex < 0 || selectedIndex >= clips.length) return;
   var v = parseFloat(val);
   if (isNaN(v)) return;
-  var c = clips[i];
+  var c = clips[selectedIndex];
   var maxVal = c.duration > 0 ? c.duration : 100;
   var endVal = (c.end === -1 || c.end > maxVal) ? maxVal : c.end;
   if (handle === 0) {
@@ -1075,27 +1117,63 @@ function onRangeIn(i, handle, val) {
     c.end = Math.round(v * 10) / 10;
     if (c.end >= maxVal) c.end = -1;
   }
-  // Patch in place — don't replace innerHTML while user is dragging
-  var card = document.querySelector('.clip-card[data-index="' + i + '"]');
-  if (!card) { renderTimeline(); return; }
-  endVal = (c.end === -1 || c.end > maxVal) ? maxVal : c.end;
+  patchEditor(c, maxVal);
+  patchTimelineCard(selectedIndex, c, maxVal);
+}
+
+function onNumIn(handle, val) {
+  if (selectedIndex < 0 || selectedIndex >= clips.length) return;
+  var v = parseFloat(val);
+  if (isNaN(v)) return;
+  var c = clips[selectedIndex];
+  var maxVal = c.duration > 0 ? c.duration : 100;
+  var endVal = (c.end === -1 || c.end > maxVal) ? maxVal : c.end;
+  if (handle === 0) {
+    if (v < 0) v = 0;
+    if (v >= endVal) v = Math.max(0, endVal - 0.1);
+    c.start = Math.round(v * 10) / 10;
+  } else {
+    if (v <= c.start) v = c.start + 0.1;
+    if (v > maxVal) v = maxVal;
+    c.end = Math.round(v * 10) / 10;
+    if (c.end >= maxVal) c.end = -1;
+  }
+  renderEditor();
+  patchTimelineCard(selectedIndex, c, maxVal);
+}
+
+function patchEditor(c, maxVal) {
+  var endVal = (c.end === -1 || c.end > maxVal) ? maxVal : c.end;
   var startPct = (c.start / maxVal * 100).toFixed(1);
   var endPct = (endVal / maxVal * 100).toFixed(1);
-  var times = card.querySelector('.clip-times');
-  if (times) times.innerHTML = '<span>' + fmtTime(c.start) + '</span><span>' + fmtTime(endVal) + '</span>';
-  var fill = card.querySelector('.range-fill');
+  var panel = document.getElementById("clipEditor");
+  var fill = panel.querySelector('.range-fill');
   if (fill) { fill.style.left = startPct + '%'; fill.style.right = (100 - endPct) + '%'; }
-  var durEl = card.querySelector('.clip-dur');
-  if (durEl) {
-    var durText = c.duration > 0 ? c.duration.toFixed(1) + 's total' : '?';
-    var trimDur = c.duration > 0 ? (endVal - c.start).toFixed(1) + 's' : '';
-    durEl.innerHTML = durText + (trimDur ? ' &bull; using ' + trimDur : '');
-  }
+  var times = panel.querySelectorAll('.editor-times input[type="number"]');
+  if (times[0]) times[0].value = c.start;
+  if (times[1]) times[1].value = endVal.toFixed(1);
+  var using = panel.querySelector('.using-label');
+  if (using) using.textContent = 'Using ' + (c.duration > 0 ? (endVal - c.start).toFixed(1) + 's' : '?');
+}
+
+function patchTimelineCard(i, c, maxVal) {
+  var card = document.querySelector('.clip-card[data-index="' + i + '"]');
+  if (!card) return;
+  var endVal = (c.end === -1 || c.end > maxVal) ? maxVal : c.end;
+  var startPct = (c.start / maxVal * 100).toFixed(1);
+  var widthPct = ((endVal - c.start) / maxVal * 100).toFixed(1);
+  var bar = card.querySelector('.clip-mini-fill');
+  if (bar) { bar.style.left = startPct + '%'; bar.style.width = widthPct + '%'; }
+  var meta = card.querySelector('.clip-meta');
+  if (meta) meta.textContent = c.duration > 0 ? (endVal - c.start).toFixed(1) + 's' : '?';
 }
 
 function removeClip(i) {
   clips.splice(i, 1);
+  if (selectedIndex === i) selectedIndex = -1;
+  else if (selectedIndex > i) selectedIndex--;
   renderTimeline();
+  renderEditor();
 }
 
 // ── Drag to reorder ──
@@ -1123,6 +1201,9 @@ function onDrop(e) {
   if (dragSrcIndex === null || dragSrcIndex === targetIndex) return;
   var moved = clips.splice(dragSrcIndex, 1)[0];
   clips.splice(targetIndex, 0, moved);
+  if (selectedIndex === dragSrcIndex) selectedIndex = targetIndex;
+  else if (dragSrcIndex < selectedIndex && targetIndex >= selectedIndex) selectedIndex--;
+  else if (dragSrcIndex > selectedIndex && targetIndex <= selectedIndex) selectedIndex++;
   renderTimeline();
 }
 

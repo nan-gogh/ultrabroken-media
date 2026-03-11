@@ -820,20 +820,35 @@ const EDITOR_HTML = `<!DOCTYPE html>
 
   .clip-card {
     background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
-    padding: 10px 12px; min-width: 180px; max-width: 220px; flex-shrink: 0;
+    padding: 10px 12px; min-width: 210px; max-width: 260px; flex-shrink: 0;
     cursor: grab; user-select: none; transition: border-color 0.15s, transform 0.15s;
   }
   .clip-card:active { cursor: grabbing; }
   .clip-card.dragging { opacity: 0.4; transform: scale(0.95); }
   .clip-card.dragover { border-color: var(--accent); border-style: dashed; }
   .clip-card .clip-name { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--text); margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .clip-card .clip-times { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
-  .clip-card input[type="number"] {
-    width: 62px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px;
-    color: var(--text); padding: 3px 6px; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
-    text-align: center;
+  .clip-card .clip-times { display: flex; gap: 6px; align-items: center; justify-content: space-between; margin-bottom: 2px; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: var(--text-dim); }
+  .range-wrap { position: relative; width: 100%; height: 22px; margin-bottom: 6px; }
+  .range-wrap input[type="range"] {
+    position: absolute; top: 0; left: 0; width: 100%; height: 22px;
+    -webkit-appearance: none; appearance: none; background: none; pointer-events: none; margin: 0;
   }
-  .clip-card input[type="number"]:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+  .range-wrap input[type="range"]::-webkit-slider-runnable-track { height: 4px; background: var(--border); border-radius: 2px; }
+  .range-wrap input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+    background: var(--accent); border: 2px solid var(--bg); cursor: pointer;
+    pointer-events: auto; margin-top: -5px; position: relative; z-index: 2;
+  }
+  .range-wrap input[type="range"]::-moz-range-track { height: 4px; background: var(--border); border-radius: 2px; border: none; }
+  .range-wrap input[type="range"]::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--accent); border: 2px solid var(--bg); cursor: pointer;
+    pointer-events: auto;
+  }
+  .range-wrap .range-fill {
+    position: absolute; top: 9px; height: 4px; background: var(--accent-dk); border-radius: 2px;
+    pointer-events: none;
+  }
   .clip-card .clip-dur { font-size: 0.68rem; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
   .clip-card .clip-actions { display: flex; gap: 4px; margin-top: 6px; }
   .clip-card .clip-actions button { padding: 2px 8px; font-size: 0.7rem; }
@@ -999,18 +1014,19 @@ function renderTimeline() {
   for (var i = 0; i < clips.length; i++) {
     var c = clips[i];
     var durText = c.duration > 0 ? c.duration.toFixed(1) + "s total" : "?";
-    var trimDur = "";
-    if (c.duration > 0) {
-      var endVal = (c.end === -1 || c.end > c.duration) ? c.duration : c.end;
-      trimDur = (endVal - c.start).toFixed(1) + "s";
-    }
+    var maxVal = c.duration > 0 ? c.duration : 100;
+    var endVal = (c.end === -1 || c.end > maxVal) ? maxVal : c.end;
+    var trimDur = c.duration > 0 ? (endVal - c.start).toFixed(1) + "s" : "";
+    var startPct = (c.start / maxVal * 100).toFixed(1);
+    var endPct = (endVal / maxVal * 100).toFixed(1);
     html += '<div class="clip-card" draggable="true" data-index="' + i + '" '
       + 'ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)">'
       + '<div class="clip-name" title="' + escHtml(c.key) + '">' + escHtml(c.name) + '</div>'
-      + '<div class="clip-times">'
-      + '<input type="number" min="0" step="0.1" value="' + c.start + '" onchange="updateClipStart(' + i + ', this.value)" title="Start (seconds)">'
-      + '<span style="color:var(--text-dim);font-size:0.75rem;">&rarr;</span>'
-      + '<input type="number" min="-1" step="0.1" value="' + (c.end === -1 ? -1 : c.end) + '" onchange="updateClipEnd(' + i + ', this.value)" title="End (seconds, -1 = full)">'
+      + '<div class="clip-times"><span>' + fmtTime(c.start) + '</span><span>' + fmtTime(endVal) + '</span></div>'
+      + '<div class="range-wrap">'
+      + '<div class="range-fill" style="left:' + startPct + '%;right:' + (100 - endPct) + '%;"></div>'
+      + '<input type="range" min="0" max="' + maxVal + '" step="0.1" value="' + c.start + '" oninput="onRangeIn(' + i + ',0,this.value)" onchange="onRangeIn(' + i + ',0,this.value)">'
+      + '<input type="range" min="0" max="' + maxVal + '" step="0.1" value="' + endVal + '" oninput="onRangeIn(' + i + ',1,this.value)" onchange="onRangeIn(' + i + ',1,this.value)">'
       + '</div>'
       + '<div class="clip-dur">' + durText + (trimDur ? " &bull; using " + trimDur : "") + '</div>'
       + '<div class="clip-actions">'
@@ -1022,18 +1038,26 @@ function renderTimeline() {
   document.getElementById("clipCount").textContent = clips.length > 0 ? clips.length + " clip(s)" : "";
 }
 
-function updateClipStart(i, val) {
-  var v = parseFloat(val);
-  if (isNaN(v) || v < 0) v = 0;
-  clips[i].start = v;
-  renderTimeline();
+function fmtTime(s) {
+  var m = Math.floor(s / 60);
+  var sec = (s % 60).toFixed(1);
+  return m > 0 ? m + ':' + (sec < 10 ? '0' : '') + sec : sec + 's';
 }
 
-function updateClipEnd(i, val) {
+function onRangeIn(i, handle, val) {
   var v = parseFloat(val);
-  if (isNaN(v) || v < -1) v = -1;
-  if (v === 0) v = -1;
-  clips[i].end = v;
+  if (isNaN(v)) return;
+  var c = clips[i];
+  var maxVal = c.duration > 0 ? c.duration : 100;
+  var endVal = (c.end === -1 || c.end > maxVal) ? maxVal : c.end;
+  if (handle === 0) {
+    if (v >= endVal) v = Math.max(0, endVal - 0.1);
+    c.start = Math.round(v * 10) / 10;
+  } else {
+    if (v <= c.start) v = c.start + 0.1;
+    c.end = Math.round(v * 10) / 10;
+    if (c.end >= maxVal) c.end = -1;
+  }
   renderTimeline();
 }
 

@@ -16,11 +16,11 @@ jobs:
   edit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Cache ffmpeg
         id: cache-ffmpeg
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: /usr/local/bin/ffmpeg
           key: ffmpeg-linux64-gpl-v1
@@ -35,7 +35,7 @@ jobs:
           rm -rf /tmp/ff.tar.xz /tmp/ffmpeg-master-latest-linux64-gpl
 
       - name: Cache npm packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.npm
           key: ${{ runner.os }}-npm-wrangler-4
@@ -89,14 +89,12 @@ jobs:
               HAS_TRIM=true
             fi
 
-            if [ "$HAS_TRIM" = true ]; then
-              ffmpeg -i "clip_${i}.${EXT_LOWER}" $TRIM_ARGS \
-                -c copy -avoid_negative_ts make_zero \
-                -y "trimmed_${i}.mkv"
-              rm -f "clip_${i}.${EXT_LOWER}"
-            else
-              mv "clip_${i}.${EXT_LOWER}" "trimmed_${i}.mkv"
-            fi
+            # Re-encode trim to intermediate (frame-accurate cuts, avoids frozen frames)
+            ffmpeg -i "clip_${i}.${EXT_LOWER}" $TRIM_ARGS \
+              -c:v libx264 -preset ultrafast -crf 0 \
+              -c:a pcm_s16le \
+              -y "trimmed_${i}.mkv"
+            rm -f "clip_${i}.${EXT_LOWER}"
 
             echo "file 'trimmed_${i}.mkv'" >> concat_list.txt
             echo "  Done"

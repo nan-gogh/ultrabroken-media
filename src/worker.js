@@ -828,25 +828,25 @@ const EDITOR_HTML = `<!DOCTYPE html>
   .clip-card.dragover { border-color: var(--accent); border-style: dashed; }
   .clip-card .clip-name { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--text); margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .clip-card .clip-times { display: flex; gap: 6px; align-items: center; justify-content: space-between; margin-bottom: 2px; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: var(--text-dim); }
-  .range-wrap { position: relative; width: 100%; height: 22px; margin-bottom: 6px; }
+  .range-wrap { position: relative; width: 100%; height: 14px; margin-bottom: 6px; border-radius: 7px; background: var(--bg); overflow: visible; }
   .range-wrap input[type="range"] {
-    position: absolute; top: 0; left: 0; width: 100%; height: 22px;
+    position: absolute; top: 0; left: 0; width: 100%; height: 14px;
     -webkit-appearance: none; appearance: none; background: none; pointer-events: none; margin: 0;
   }
-  .range-wrap input[type="range"]::-webkit-slider-runnable-track { height: 4px; background: var(--border); border-radius: 2px; }
+  .range-wrap input[type="range"]::-webkit-slider-runnable-track { height: 14px; background: transparent; border-radius: 7px; }
   .range-wrap input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
     background: var(--accent); border: 2px solid var(--bg); cursor: pointer;
-    pointer-events: auto; margin-top: -5px; position: relative; z-index: 2;
+    pointer-events: auto; margin-top: 0; position: relative; z-index: 2;
   }
-  .range-wrap input[type="range"]::-moz-range-track { height: 4px; background: var(--border); border-radius: 2px; border: none; }
+  .range-wrap input[type="range"]::-moz-range-track { height: 14px; background: transparent; border-radius: 7px; border: none; }
   .range-wrap input[type="range"]::-moz-range-thumb {
     width: 14px; height: 14px; border-radius: 50%;
     background: var(--accent); border: 2px solid var(--bg); cursor: pointer;
     pointer-events: auto;
   }
   .range-wrap .range-fill {
-    position: absolute; top: 9px; height: 4px; background: var(--accent-dk); border-radius: 2px;
+    position: absolute; top: 0; height: 14px; background: var(--accent-dk); border-radius: 7px;
     pointer-events: none;
   }
   .clip-card .clip-dur { font-size: 0.68rem; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
@@ -1025,8 +1025,8 @@ function renderTimeline() {
       + '<div class="clip-times"><span>' + fmtTime(c.start) + '</span><span>' + fmtTime(endVal) + '</span></div>'
       + '<div class="range-wrap">'
       + '<div class="range-fill" style="left:' + startPct + '%;right:' + (100 - endPct) + '%;"></div>'
-      + '<input type="range" min="0" max="' + maxVal + '" step="0.1" value="' + c.start + '" oninput="onRangeIn(' + i + ',0,this.value)" onchange="onRangeIn(' + i + ',0,this.value)">'
-      + '<input type="range" min="0" max="' + maxVal + '" step="0.1" value="' + endVal + '" oninput="onRangeIn(' + i + ',1,this.value)" onchange="onRangeIn(' + i + ',1,this.value)">'
+      + '<input type="range" min="0" max="' + maxVal + '" step="0.1" value="' + c.start + '" oninput="onRangeIn(' + i + ',0,this.value)" onmousedown="lockDrag(this)" ontouchstart="lockDrag(this)">'
+      + '<input type="range" min="0" max="' + maxVal + '" step="0.1" value="' + endVal + '" oninput="onRangeIn(' + i + ',1,this.value)" onmousedown="lockDrag(this)" ontouchstart="lockDrag(this)">'
       + '</div>'
       + '<div class="clip-dur">' + durText + (trimDur ? " &bull; using " + trimDur : "") + '</div>'
       + '<div class="clip-actions">'
@@ -1044,6 +1044,23 @@ function fmtTime(s) {
   return m > 0 ? m + ':' + (sec < 10 ? '0' : '') + sec : sec + 's';
 }
 
+function lockDrag(input) {
+  var card = input.closest('.clip-card');
+  if (!card) return;
+  card.setAttribute('draggable', 'false');
+  function unlock() {
+    card.setAttribute('draggable', 'true');
+    input.removeEventListener('mouseup', unlock);
+    input.removeEventListener('touchend', unlock);
+    document.removeEventListener('mouseup', unlock);
+    document.removeEventListener('touchend', unlock);
+  }
+  input.addEventListener('mouseup', unlock);
+  input.addEventListener('touchend', unlock);
+  document.addEventListener('mouseup', unlock);
+  document.addEventListener('touchend', unlock);
+}
+
 function onRangeIn(i, handle, val) {
   var v = parseFloat(val);
   if (isNaN(v)) return;
@@ -1058,7 +1075,22 @@ function onRangeIn(i, handle, val) {
     c.end = Math.round(v * 10) / 10;
     if (c.end >= maxVal) c.end = -1;
   }
-  renderTimeline();
+  // Patch in place — don't replace innerHTML while user is dragging
+  var card = document.querySelector('.clip-card[data-index="' + i + '"]');
+  if (!card) { renderTimeline(); return; }
+  endVal = (c.end === -1 || c.end > maxVal) ? maxVal : c.end;
+  var startPct = (c.start / maxVal * 100).toFixed(1);
+  var endPct = (endVal / maxVal * 100).toFixed(1);
+  var times = card.querySelector('.clip-times');
+  if (times) times.innerHTML = '<span>' + fmtTime(c.start) + '</span><span>' + fmtTime(endVal) + '</span>';
+  var fill = card.querySelector('.range-fill');
+  if (fill) { fill.style.left = startPct + '%'; fill.style.right = (100 - endPct) + '%'; }
+  var durEl = card.querySelector('.clip-dur');
+  if (durEl) {
+    var durText = c.duration > 0 ? c.duration.toFixed(1) + 's total' : '?';
+    var trimDur = c.duration > 0 ? (endVal - c.start).toFixed(1) + 's' : '';
+    durEl.innerHTML = durText + (trimDur ? ' &bull; using ' + trimDur : '');
+  }
 }
 
 function removeClip(i) {

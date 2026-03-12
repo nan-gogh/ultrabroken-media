@@ -569,7 +569,7 @@ const MANAGE_HTML = `<!DOCTYPE html>
     <option value="social/">social/</option>
   </select>
   </div>
-  <button class="btn danger" onclick="purgePrefix()" title="Delete ALL files in the current tab's prefix">Purge prefix&hellip;</button>
+  <!-- <button class="btn danger" onclick="purgePrefix()" title="Delete ALL files in the current tab's prefix">Purge&hellip;</button> -->
 </div>
 
 <div class="upload-zone" id="dropzone">
@@ -969,14 +969,14 @@ const EDITOR_HTML = `<!DOCTYPE html>
   .editor-range input[type="range"]::-webkit-slider-runnable-track { height: 24px; background: transparent; border-radius: 12px; }
   .editor-range input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%;
-    background: var(--accent); border: 3px solid var(--bg); cursor: pointer;
-    pointer-events: auto; margin-top: 0; position: relative; z-index: 2; outline: none;
+    background: var(--accent); border: none; cursor: pointer;
+    pointer-events: auto; margin-top: 0; position: relative; z-index: 2; outline: none; box-shadow: none;
   }
   .editor-range input[type="range"]::-moz-range-track { height: 24px; background: transparent; border-radius: 12px; border: none; }
   .editor-range input[type="range"]::-moz-range-thumb {
     width: 24px; height: 24px; border-radius: 50%;
-    background: var(--accent); border: 3px solid var(--bg); cursor: pointer;
-    pointer-events: auto; outline: none;
+    background: var(--accent); border: none; cursor: pointer;
+    pointer-events: auto; outline: none; box-shadow: none;
   }
   .editor-range .range-fill {
     position: absolute; top: 0; height: 24px; background: var(--accent-dk); border-radius: 0;
@@ -1129,14 +1129,25 @@ function previewClip(key, startTime) {
 }
 
 // ── Timeline ──
-async function addClip(key) {
+function addClip(key) {
   var name = key.replace(/^video\\//, "");
-  var dur = await getVideoDuration(BASE_URL + key);
-  clips.push({ id: nextClipId++, key: key, name: name, start: 0, end: dur || -1, duration: dur || 0 });
+  var clipId = nextClipId++;
+  clips.push({ id: clipId, key: key, name: name, start: 0, end: -1, duration: 0 });
   selectedIndex = clips.length - 1;
   renderTimeline();
   renderEditor();
   showStatus("Added: " + name, true, 3000);
+  getVideoDuration(BASE_URL + key).then(function(dur) {
+    for (var i = 0; i < clips.length; i++) {
+      if (clips[i].id === clipId) {
+        clips[i].duration = dur || 0;
+        clips[i].end = dur || -1;
+        break;
+      }
+    }
+    renderTimeline();
+    if (selectedIndex >= 0 && selectedIndex < clips.length && clips[selectedIndex].id === clipId) renderEditor();
+  });
 }
 
 function getVideoDuration(url) {

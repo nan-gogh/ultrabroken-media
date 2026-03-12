@@ -649,7 +649,7 @@ async function loadFiles() {
       var isPending = f.transcode === 'pending' || f.optimize === 'pending';
       var dis = isPending ? ' disabled' : '';
       html += '<div class="file-row">'
-        + '<span class="name" onclick="previewFile(\\'' + escAttr(f.key) + '\\')" title="' + escHtml(f.key) + '">' + escHtml(name) + ' ' + badge + '</span>'
+        + '<span class="name" onclick="previewFile(\\'' + escAttr(f.key) + '\\')" title="' + escHtml(f.key) + '">' + escHtml(name) + '</span>' + badge
         + '<span class="meta"><span class="size">' + size + '</span>'
         + '<span class="date">' + date + '</span></span>'
         + '<span class="actions">'
@@ -1109,7 +1109,7 @@ async function loadLibrary() {
       var size = formatSize(f.size);
       var badge = f.transcode === "pending" ? ' <span style="color:#ffaa32;font-size:0.68rem;">\\u23F3</span>' : "";
       html += '<div class="library-row">'
-        + '<span class="name" onclick="previewClip(\\'' + escAttr(f.key) + '\\')" title="Click to preview">' + escHtml(name) + badge + '</span>'
+        + '<span class="name" onclick="previewClip(\\'' + escAttr(f.key) + '\\')" title="Click to preview">' + escHtml(name) + '</span>' + badge
         + '<span class="size">' + size + '</span>'
         + '<button class="btn" onclick="addClip(\\'' + escAttr(f.key) + '\\')">+</button>'
         + '</div>';

@@ -59,12 +59,6 @@ jobs:
             stem="${key%.*}"
             out_key="${stem}.mp4"
 
-            # Skip if already an mp4 (likely already transcoded)
-            if [ "$ext_lower" = "mp4" ]; then
-              echo "Skipping $key — already MP4"
-              continue
-            fi
-
             echo "=== Transcoding: $key ==="
 
             # Download from R2

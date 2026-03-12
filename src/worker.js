@@ -827,65 +827,17 @@ async function updateGlobalPending() {
     globalPending = results.flatMap(d => d.files || []).filter(f => f.transcode === 'pending' || f.optimize === 'pending').length;
   } catch { globalPending = 0; }
 }
-let lastSnapshot = '';
 function scheduleRefresh() {
   if (refreshTimer) return;
   refreshTimer = setInterval(async () => {
     if (!document.querySelector('.badge-transcode')) {
       clearInterval(refreshTimer);
       refreshTimer = null;
-      lastSnapshot = '';
       return;
     }
-    try {
-      let allFiles = [], cursor = null;
-      do {
-        const params = new URLSearchParams({ prefix: currentPrefix });
-        if (cursor) params.set('cursor', cursor);
-        const data = await fetch(API + '/list?' + params).then(r => r.json());
-        allFiles = allFiles.concat(data.files);
-        cursor = data.truncated ? data.cursor : null;
-      } while (cursor);
-      const snapshot = allFiles.map(f => f.key + ':' + (f.transcode || '') + (f.optimize || '')).join(',');
-      if (snapshot === lastSnapshot) return;
-      lastSnapshot = snapshot;
-      const fileMap = new Map(allFiles.map(f => [f.key, f]));
-      const rows = container.querySelectorAll('.file-row');
-      const totalPending = Math.max(globalPending, allFiles.filter(f => f.transcode === 'pending' || f.optimize === 'pending').length);
-      let structureChanged = rows.length !== allFiles.length;
-      if (!structureChanged) {
-        rows.forEach(row => {
-          const nameEl = row.querySelector('.name');
-          if (!nameEl || !fileMap.has(nameEl.title)) structureChanged = true;
-        });
-      }
-      if (structureChanged) {
-        const scrollY = window.scrollY;
-        await loadFiles();
-        window.scrollTo({ top: scrollY, behavior: 'instant' });
-        return;
-      }
-      rows.forEach(row => {
-        const key = row.querySelector('.name').title;
-        const f = fileMap.get(key);
-        const isPending = f.transcode === 'pending' || f.optimize === 'pending';
-        const badge = row.querySelector('.badge-transcode');
-        if (badge && !isPending) {
-          const size = formatSize(f.size);
-          const date = new Date(f.uploaded).toLocaleDateString();
-          const meta = document.createElement('span');
-          meta.className = 'meta';
-          meta.innerHTML = '<span class="size">' + size + '</span><span class="date">' + date + '</span>';
-          badge.replaceWith(meta);
-          row.querySelectorAll('.actions .btn[disabled]').forEach(b => b.removeAttribute('disabled'));
-        } else if (badge) {
-          const txt = f.transcode === 'pending'
-            ? (totalPending > 1 ? '\\u23F3 transcoding queued' : '\\u23F3 transcoding')
-            : (totalPending > 1 ? '\\u23F3 optimizing queued' : '\\u23F3 optimizing');
-          if (badge.textContent !== txt) badge.textContent = txt;
-        }
-      });
-    } catch {}
+    container.style.minHeight = container.offsetHeight + 'px';
+    await loadFiles();
+    container.style.minHeight = '';
   }, 10000);
 }
 

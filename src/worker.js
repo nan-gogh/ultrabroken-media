@@ -12,7 +12,7 @@
  *   GET  /*                 â†’ Serve file from R2 (public)
  */
 
-const ALLOWED_PREFIXES = ["screens/", "video/", "social/", "graphics/"];
+const ALLOWED_PREFIXES = ["image/", "video/", "social/"];
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB (raw video before transcode)
 
 const MIME_TYPES = {
@@ -457,6 +457,10 @@ const MANAGE_HTML = `<!DOCTYPE html>
   }
   .upload-zone p { color: var(--text-dim); font-size: 0.9rem; }
   .upload-zone p strong { color: var(--accent); }
+  .upload-zone .img-dest { display: inline-flex; gap: 0; margin-top: 8px; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; }
+  .upload-zone .img-dest button { background: transparent; color: var(--text-dim); border: none; padding: 4px 12px; cursor: pointer; transition: background 0.15s, color 0.15s; }
+  .upload-zone .img-dest button.active { background: var(--accent); color: var(--bg); }
+  .upload-zone .img-dest button:not(.active):hover { color: var(--text); }
 
   /* Prefix selector */
 
@@ -548,16 +552,18 @@ const MANAGE_HTML = `<!DOCTYPE html>
 
 <div class="upload-zone" id="dropzone">
   <p><strong>Drop files here</strong> or click to browse</p>
-  <p style="margin-top:6px;font-size:0.78rem;color:var(--text-dim);">Videos &rarr; <code>video/</code> (H.264 transcode) &nbsp;&bull;&nbsp; Images &rarr; <code>screens/</code> (AVIF optimize)</p>
+  <p style="margin-top:6px;font-size:0.78rem;">Videos &rarr; <code>video/</code> (H.264 transcode) &nbsp;&bull;&nbsp; Images &darr;</p>
+  <div class="img-dest" onclick="event.stopPropagation()">
+    <button class="active" onclick="setImgDest('image/')">image/</button>
+  </div>
   <input type="file" id="fileInput" multiple hidden>
 </div>
 
 <div id="status"></div>
 
 <div class="tabs">
-  <button class="active" onclick="switchTab('screens/')">screens/</button>
+  <button class="active" onclick="switchTab('image/')">image/</button>
   <button onclick="switchTab('video/')">video/</button>
-  <button onclick="switchTab('graphics/')">graphics/</button>
   <button onclick="switchTab('social/')">social/</button>
 </div>
 
@@ -567,7 +573,14 @@ const MANAGE_HTML = `<!DOCTYPE html>
 
 <script>
 const API = "/manage/api";
-let currentPrefix = "screens/";
+let currentPrefix = "image/";
+let imgDest = "image/";
+
+function setImgDest(dest) {
+  imgDest = dest;
+  document.querySelectorAll('.img-dest button').forEach(b =>
+    b.classList.toggle('active', b.textContent.trim() === dest));
+}
 
 // â”€â”€ Tab switching â”€â”€
 function switchTab(prefix) {
@@ -681,7 +694,7 @@ async function uploadFiles(rawFiles) {
   }
   if (images.length) {
     const form = new FormData();
-    form.set("prefix", "screens/");
+    form.set("prefix", imgDest);
     for (const f of images) form.append("file", f);
     uploads.push(fetch(API + "/upload", { method: "POST", body: form }).then(r => r.json()));
   }

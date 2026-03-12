@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       keys:
-        description: 'Comma-separated R2 keys to optimize (e.g., screens/shot.jpg,screens/demo.png)'
+        description: 'Comma-separated R2 keys to optimize (e.g., image/shot.jpg,image/demo.png)'
         required: true
         type: string
 

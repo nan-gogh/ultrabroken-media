@@ -12,7 +12,7 @@
  *   GET  /*                 â†’ Serve file from R2 (public)
  */
 
-const ALLOWED_PREFIXES = ["screens/", "video/", "social/"];
+const ALLOWED_PREFIXES = ["screens/", "video/", "social/", "graphics/"];
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB (raw video before transcode)
 
 const MIME_TYPES = {
@@ -459,15 +459,6 @@ const MANAGE_HTML = `<!DOCTYPE html>
   .upload-zone p strong { color: var(--accent); }
 
   /* Prefix selector */
-  .prefix-bar { display: flex; gap: 10px; margin-bottom: 18px; align-items: center; }
-  .prefix-bar label { color: var(--text-dim); font-size: 0.82rem; font-family: 'JetBrains Mono', monospace; }
-  .prefix-bar select {
-    background: var(--surface); color: var(--accent); border: 1px solid var(--border);
-    padding: 6px 12px; border-radius: 4px;
-    font-family: 'JetBrains Mono', monospace; font-size: 0.82rem;
-    cursor: pointer;
-  }
-  .prefix-bar select:focus { outline: 1px solid var(--accent); }
 
   /* File list */
   .file-list { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface); }
@@ -555,31 +546,19 @@ const MANAGE_HTML = `<!DOCTYPE html>
   </div>
 </header>
 
-<div class="tabs">
-  <button class="active" onclick="switchTab('screens/')">screens/</button>
-  <button onclick="switchTab('video/')">video/</button>
-  <button onclick="switchTab('social/')">social/</button>
+<div class="upload-zone" id="dropzone">
+  <p><strong>Drop files here</strong> or click to browse</p>
+  <p style="margin-top:6px;font-size:0.78rem;color:var(--text-dim);">Videos &rarr; <code>video/</code> (H.264 transcode) &nbsp;&bull;&nbsp; Images &rarr; <code>screens/</code> (AVIF optimize)</p>
+  <input type="file" id="fileInput" multiple hidden>
 </div>
 
 <div id="status"></div>
 
-<div class="prefix-bar" style="justify-content:space-between;">
-  <div style="display:flex;gap:10px;align-items:center;">
-  <label>Upload to:</label>
-  <select id="prefix" onchange="switchTab(this.value)">
-    <option value="screens/">screens/</option>
-    <option value="video/">video/</option>
-    <option value="social/">social/</option>
-  </select>
-  </div>
-  <!-- <button class="btn danger" onclick="purgePrefix()" title="Delete ALL files in the current tab's prefix">Purge&hellip;</button> -->
-</div>
-
-<div class="upload-zone" id="dropzone">
-  <p><strong>Drop files here</strong> or click to browse</p>
-  <p id="dropzoneHint" style="margin-top:6px;font-size:0.78rem;">Images only &mdash; auto-optimize to AVIF</p>
-  <p style="margin-top:3px;font-size:0.72rem;color:var(--text-dim);">Max 50 MB per file &mdash; Optimization runs server-side via GitHub Actions</p>
-  <input type="file" id="fileInput" multiple hidden accept="image/*">
+<div class="tabs">
+  <button class="active" onclick="switchTab('screens/')">screens/</button>
+  <button onclick="switchTab('video/')">video/</button>
+  <button onclick="switchTab('graphics/')">graphics/</button>
+  <button onclick="switchTab('social/')">social/</button>
 </div>
 
 <div id="fileListContainer">
@@ -593,14 +572,8 @@ let currentPrefix = "screens/";
 // â”€â”€ Tab switching â”€â”€
 function switchTab(prefix) {
   currentPrefix = prefix;
-  document.getElementById("prefix").value = prefix;
   document.querySelectorAll(".tabs button").forEach(b =>
     b.classList.toggle("active", b.textContent.trim() === prefix));
-  const isVideo = prefix === 'video/';
-  document.getElementById("fileInput").accept = isVideo ? 'video/*' : 'image/*';
-  document.getElementById("dropzoneHint").textContent = isVideo
-    ? 'Videos only \u2014 auto-transcode to H.264+AAC MP4'
-    : 'Images only \u2014 auto-optimize to AVIF';
   loadFiles();
 }
 
@@ -641,17 +614,15 @@ async function loadFiles() {
       const name = f.key.slice(currentPrefix.length);
       const size = formatSize(f.size);
       const date = new Date(f.uploaded).toLocaleDateString();
-      const badge = f.transcode === 'pending'
-        ? '<span class="badge-transcode">\u23F3 transcoding</span>'
-        : f.optimize === 'pending'
-        ? '<span class="badge-transcode">\u23F3 optimizing</span>'
-        : '';
       var isPending = f.transcode === 'pending' || f.optimize === 'pending';
       var dis = isPending ? ' disabled' : '';
+      var metaHtml = isPending
+        ? '<span class="badge-transcode">' + (f.transcode === 'pending' ? '\u23F3 transcoding' : '\u23F3 optimizing') + '</span>'
+        : '<span class="meta"><span class="size">' + size + '</span>'
+          + '<span class="date">' + date + '</span></span>';
       html += '<div class="file-row">'
-        + '<span class="name" onclick="previewFile(\\'' + escAttr(f.key) + '\\')" title="' + escHtml(f.key) + '">' + escHtml(name) + '</span>' + badge
-        + '<span class="meta"><span class="size">' + size + '</span>'
-        + '<span class="date">' + date + '</span></span>'
+        + '<span class="name" onclick="previewFile(\\'' + escAttr(f.key) + '\\')" title="' + escHtml(f.key) + '">' + escHtml(name) + '</span>'
+        + metaHtml
         + '<span class="actions">'
         + '  <a class="btn" href="/' + encodeURI(f.key) + '" download title="Download"' + dis + '>&#8595;</a>'
         + '  <button class="btn" onclick="copyUrl(\\'' + escAttr(f.key) + '\\')" title="Copy URL"' + dis + '>&#128203;</button>'
@@ -691,29 +662,37 @@ fileInput.addEventListener("change", () => uploadFiles(fileInput.files));
 
 async function uploadFiles(rawFiles) {
   if (!rawFiles.length) return;
-  const prefix = document.getElementById("prefix").value;
-  const isVideo = prefix === 'video/';
   const files = Array.from(rawFiles).filter(f =>
-    isVideo ? f.type.startsWith('video/') : f.type.startsWith('image/')
+    f.type.startsWith('video/') || f.type.startsWith('image/')
   );
   const rejected = rawFiles.length - files.length;
-  if (rejected > 0) showStatus(rejected + ' file(s) skipped \u2014 ' + prefix + ' only accepts ' + (isVideo ? 'videos' : 'images'), false);
+  if (rejected > 0) showStatus(rejected + ' file(s) skipped \u2014 only images and videos accepted', false);
   if (!files.length) return;
 
-  const form = new FormData();
-  form.set("prefix", prefix);
-  for (const f of files) {
-    form.append("file", f);
+  const videos = files.filter(f => f.type.startsWith('video/'));
+  const images = files.filter(f => f.type.startsWith('image/'));
+  const uploads = [];
+
+  if (videos.length) {
+    const form = new FormData();
+    form.set("prefix", "video/");
+    for (const f of videos) form.append("file", f);
+    uploads.push(fetch(API + "/upload", { method: "POST", body: form }).then(r => r.json()));
+  }
+  if (images.length) {
+    const form = new FormData();
+    form.set("prefix", "screens/");
+    for (const f of images) form.append("file", f);
+    uploads.push(fetch(API + "/upload", { method: "POST", body: form }).then(r => r.json()));
   }
 
   try {
     showStatus("Uploading " + files.length + " file(s)...", true);
-    const res = await fetch(API + "/upload", { method: "POST", body: form });
-    const data = await res.json();
-    const ok = data.results.filter(r => r.ok).length;
-    const fail = data.results.filter(r => r.error);
-    const videoCount = data.results.filter(r => r.ok && /\.(mov|webm|mkv)$/i.test(r.key)).length;
-    const imageCount = data.results.filter(r => r.ok && /\.(png|jpe?g|webp|bmp|tiff?)$/i.test(r.key)).length;
+    const results = (await Promise.all(uploads)).flatMap(d => d.results);
+    const ok = results.filter(r => r.ok).length;
+    const fail = results.filter(r => r.error);
+    const videoCount = results.filter(r => r.ok && /\.(mp4|mov|webm|mkv)$/i.test(r.key)).length;
+    const imageCount = results.filter(r => r.ok && /\.(png|jpe?g|webp|bmp|tiff?)$/i.test(r.key)).length;
     let msg = ok + " file(s) uploaded";
     if (imageCount) msg += " \u2014 " + imageCount + " image(s) queued for AVIF optimization";
     if (videoCount) msg += " \u2014 " + videoCount + " video(s) queued for H.264 transcode";
@@ -1136,7 +1115,7 @@ function previewClip(key, startTime) {
   var url = BASE_URL + key;
   var t = startTime || 0;
   box.innerHTML = '<video controls preload="metadata" src="' + url + '#t=' + t + '"></video>';
-  box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 // ── Timeline ──

@@ -478,10 +478,12 @@ const MANAGE_HTML = `<!DOCTYPE html>
   }
   .file-row:last-child { border-bottom: none; }
   .file-row:hover { background: var(--surface2); }
-  .file-row .name { flex: 1; word-break: break-all; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--text); }
-  .file-row .size { color: var(--text-dim); min-width: 72px; text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; }
-  .file-row .date { color: var(--text-dim); min-width: 92px; text-align: right; font-size: 0.75rem; }
-  .file-row .actions { display: flex; gap: 6px; }
+  .file-row .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--text); cursor: pointer; }
+  .file-row .name:hover { color: var(--accent); }
+  .file-row .size { color: var(--text-dim); white-space: nowrap; text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; }
+  .file-row .date { color: var(--text-dim); white-space: nowrap; text-align: right; font-size: 0.75rem; }
+  .file-row .actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .file-row .actions .btn[disabled] { opacity: 0.3; pointer-events: none; }
   .badge-transcode {
     display: inline-block; padding: 2px 8px; border-radius: 10px;
     font-size: 0.68rem; font-family: 'JetBrains Mono', monospace;
@@ -503,7 +505,7 @@ const MANAGE_HTML = `<!DOCTYPE html>
     text-decoration: none; display: inline-block; line-height: 1.4;
   }
   button.btn:hover, a.btn:hover { color: var(--accent); border-color: var(--accent); }
-  button.btn.danger { }
+  button.btn.danger { color: #d4453a; border-color: rgba(248,81,73,0.35); }
   button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 
   /* Status */
@@ -643,16 +645,17 @@ async function loadFiles() {
         : f.optimize === 'pending'
         ? '<span class="badge-transcode">\u23F3 optimizing</span>'
         : '';
+      var isPending = f.transcode === 'pending' || f.optimize === 'pending';
+      var dis = isPending ? ' disabled' : '';
       html += '<div class="file-row">'
-        + '<span class="name">' + escHtml(name) + ' ' + badge + '</span>'
+        + '<span class="name" onclick="previewFile(\\'' + escAttr(f.key) + '\\')" title="' + escHtml(f.key) + '">' + escHtml(name) + ' ' + badge + '</span>'
         + '<span class="size">' + size + '</span>'
         + '<span class="date">' + date + '</span>'
         + '<span class="actions">'
-        + '  <button class="btn" onclick="previewFile(\\'' + escAttr(f.key) + '\\')">Preview</button>'
-        + '  <a class="btn" href="/' + encodeURI(f.key) + '" download title="Download">&#8595;</a>'
-        + '  <button class="btn" onclick="copyUrl(\\'' + escAttr(f.key) + '\\')">Copy URL</button>'
-        + '  <button class="btn" onclick="renameFile(\\'' + escAttr(f.key) + '\\')">Rename</button>'
-        + '  <button class="btn danger" onclick="deleteFile(\\'' + escAttr(f.key) + '\\')">Delete</button>'
+        + '  <a class="btn" href="/' + encodeURI(f.key) + '" download title="Download"' + dis + '>&#8595;</a>'
+        + '  <button class="btn" onclick="copyUrl(\\'' + escAttr(f.key) + '\\')" title="Copy URL"' + dis + '>&#128203;</button>'
+        + '  <button class="btn" onclick="renameFile(\\'' + escAttr(f.key) + '\\')" title="Rename"' + dis + '>&#9998;</button>'
+        + '  <button class="btn danger" onclick="deleteFile(\\'' + escAttr(f.key) + '\\')" title="Delete">&#10005;</button>'
         + '</span></div>';
     }
     html += '</div>';
@@ -788,7 +791,7 @@ function previewFile(key) {
   overlay.appendChild(close);
   if (isVideo) {
     var vid = document.createElement('video');
-    vid.controls = true; vid.autoplay = true; vid.src = url;
+    vid.controls = true; vid.autoplay = true; vid.playsInline = true; vid.muted = true; vid.src = url;
     overlay.appendChild(vid);
   } else {
     var img = document.createElement('img');

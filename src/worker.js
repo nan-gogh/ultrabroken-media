@@ -947,13 +947,14 @@ const EDITOR_HTML = `<!DOCTYPE html>
   .clip-card {
     background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
     padding: 8px 10px; min-width: 120px; max-width: 170px; flex-shrink: 0;
-    cursor: grab; user-select: none; transition: border-color 0.15s, transform 0.15s;
+    cursor: grab; -webkit-user-select: none; user-select: none; transition: border-color 0.15s, transform 0.15s;
   }
   .clip-card:active { cursor: grabbing; }
   .clip-card.selected { border-color: var(--accent); box-shadow: var(--glow); }
   .clip-card.dragging { opacity: 0.4; transform: scale(0.95); }
   .clip-card.dragover { border-color: var(--accent); border-style: dashed; }
-  .clip-card .clip-name { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--text); margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .clip-card .clip-name { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--text); margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+  .clip-card .clip-name:hover { color: var(--accent); }
   .clip-card .clip-mini-bar { position: relative; width: 100%; height: 6px; border-radius: 3px; background: var(--bg); margin-bottom: 4px; }
   .clip-card .clip-mini-fill { position: absolute; top: 0; height: 6px; border-radius: 3px; background: var(--accent-dk); }
   .clip-card .clip-meta { font-size: 0.65rem; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; margin-bottom: 4px; }
@@ -1135,6 +1136,7 @@ function previewClip(key, startTime) {
   var url = BASE_URL + key;
   var t = startTime || 0;
   box.innerHTML = '<video controls preload="metadata" src="' + url + '#t=' + t + '"></video>';
+  box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 // ── Timeline ──
@@ -1183,11 +1185,10 @@ function renderTimeline() {
     html += '<div class="clip-card' + sel + '" draggable="true" data-index="' + i + '" '
       + 'onclick="selectClip(' + i + ')" '
       + 'ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)">'
-      + '<div class="clip-name" title="' + escHtml(c.key) + '">' + escHtml(c.name) + '</div>'
+      + '<div class="clip-name" title="' + escHtml(c.key) + '" onclick="event.stopPropagation();previewClip(\\'' + escAttr(c.key) + '\\', ' + c.start + ')">' + escHtml(c.name) + '</div>'
       + '<div class="clip-mini-bar"><div class="clip-mini-fill" style="left:' + startPct + '%;width:' + widthPct + '%;"></div></div>'
       + '<div class="clip-meta">' + (trimDur || "?") + '</div>'
       + '<div class="clip-actions">'
-      + '<button class="btn" onclick="event.stopPropagation();previewClip(\\'' + escAttr(c.key) + '\\', ' + c.start + ')">Preview</button>'
       + '<button class="btn danger" onclick="event.stopPropagation();removeClip(' + i + ')">&times;</button>'
       + '</div></div>';
   }

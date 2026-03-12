@@ -1,4 +1,4 @@
-name: Media — Transcode Video to AV1+Opus
+name: Media — Transcode Video to H.264+AAC
 
 on:
   workflow_dispatch:
@@ -57,11 +57,11 @@ jobs:
             ext="${key##*.}"
             ext_lower=$(echo "$ext" | tr '[:upper:]' '[:lower:]')
             stem="${key%.*}"
-            out_key="${stem}.webm"
+            out_key="${stem}.mp4"
 
-            # Skip if already a webm (likely already transcoded)
-            if [ "$ext_lower" = "webm" ]; then
-              echo "Skipping $key — already WebM"
+            # Skip if already an mp4 (likely already transcoded)
+            if [ "$ext_lower" = "mp4" ]; then
+              echo "Skipping $key — already MP4"
               continue
             fi
 
@@ -73,21 +73,22 @@ jobs:
             original_size=$(stat -c%s "input.$ext_lower")
             echo "Original: $(numfmt --to=iec $original_size)"
 
-            # Transcode: AV1+Opus, max 1080p30, CRF 35
+            # Transcode: H.264+AAC, max 1080p30, CRF 24
             ffmpeg -i "input.$ext_lower" \
-              -c:v libsvtav1 -crf 35 -preset 6 \
+              -c:v libx264 -crf 24 -preset slow \
               -vf "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease" \
               -r 30 \
-              -c:a libopus -b:a 96k \
-              -y "output.webm"
+              -c:a aac -b:a 96k \
+              -movflags +faststart \
+              -y "output.mp4"
 
-            new_size=$(stat -c%s "output.webm")
+            new_size=$(stat -c%s "output.mp4")
             savings=$(( (original_size - new_size) * 100 / original_size ))
             echo "Transcoded: $(numfmt --to=iec $new_size) (-${savings}%)"
 
             # Upload transcoded file
             wrangler r2 object put "ultrabroken-media/$out_key" \
-              --file="output.webm" --content-type="video/webm" --remote
+              --file="output.mp4" --content-type="video/mp4" --remote
             echo "Uploaded: $out_key"
 
             # Delete the original if the key changed
@@ -97,7 +98,7 @@ jobs:
             fi
 
             # Cleanup temp files
-            rm -f "input.$ext_lower" "output.webm"
+            rm -f "input.$ext_lower" "output.mp4"
             echo "=== Done: $key → $out_key ==="
             echo ""
           done

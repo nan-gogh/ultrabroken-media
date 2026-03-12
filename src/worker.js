@@ -132,7 +132,7 @@ async function handleUpload(request, env) {
     const putOptions = {
       httpMetadata: { contentType: value.type || getMime(key) },
     };
-    if (!skipWorkflow && /\.(mp4|mov|mkv)$/i.test(key)) {
+    if (!skipWorkflow && /\.(mov|mkv|webm)$/i.test(key)) {
       putOptions.customMetadata = { transcode: 'pending' };
     } else if (!skipWorkflow && /\.(png|jpe?g|webp|bmp|tiff?)$/i.test(key)) {
       putOptions.customMetadata = { optimize: 'pending' };
@@ -144,9 +144,9 @@ async function handleUpload(request, env) {
 
   // Dispatch optimization/transcode workflows
   const dispatches = [];
-  const videoUploaded = results.some(r => r.ok && /\.(mp4|mov|mkv)$/i.test(r.key));
+  const videoUploaded = results.some(r => r.ok && /\.(mov|mkv|webm)$/i.test(r.key));
   if (!skipWorkflow && videoUploaded && env.GITHUB_TOKEN) {
-    const videoKeys = results.filter(r => r.ok && /\.(mp4|mov|mkv)$/i.test(r.key)).map(r => r.key);
+    const videoKeys = results.filter(r => r.ok && /\.(mov|mkv|webm)$/i.test(r.key)).map(r => r.key);
     try {
       const resp = await fetch('https://api.github.com/repos/' + (env.GITHUB_REPO || 'nan-gogh/ultrabroken-media') + '/actions/workflows/transcode.yml/dispatches', {
         method: 'POST',
@@ -229,7 +229,7 @@ async function handleEdit(request, env) {
     return Response.json({ error: "No output name provided" }, { status: 400 });
   }
 
-  const outputKey = output.endsWith('.webm') ? output : output + '.webm';
+  const outputKey = output.endsWith('.mp4') ? output : output + '.mp4';
   if (!isValidKey(outputKey)) {
     return Response.json({ error: "Invalid output path" }, { status: 400 });
   }
@@ -256,7 +256,7 @@ async function handleEdit(request, env) {
 
   // Create placeholder so manage page shows pending badge
   await env.MEDIA.put(outputKey, new Uint8Array(0), {
-    httpMetadata: { contentType: 'video/webm' },
+    httpMetadata: { contentType: 'video/mp4' },
     customMetadata: { transcode: 'pending' },
   });
 
@@ -599,7 +599,7 @@ function switchTab(prefix) {
   const isVideo = prefix === 'video/';
   document.getElementById("fileInput").accept = isVideo ? 'video/*' : 'image/*';
   document.getElementById("dropzoneHint").textContent = isVideo
-    ? 'Videos only \u2014 auto-transcode to AV1+Opus WebM'
+    ? 'Videos only \u2014 auto-transcode to H.264+AAC MP4'
     : 'Images only \u2014 auto-optimize to AVIF';
   loadFiles();
 }
@@ -712,11 +712,11 @@ async function uploadFiles(rawFiles) {
     const data = await res.json();
     const ok = data.results.filter(r => r.ok).length;
     const fail = data.results.filter(r => r.error);
-    const videoCount = data.results.filter(r => r.ok && /\.(mp4|mov|webm|mkv)$/i.test(r.key)).length;
+    const videoCount = data.results.filter(r => r.ok && /\.(mov|webm|mkv)$/i.test(r.key)).length;
     const imageCount = data.results.filter(r => r.ok && /\.(png|jpe?g|webp|bmp|tiff?)$/i.test(r.key)).length;
     let msg = ok + " file(s) uploaded";
     if (imageCount) msg += " \u2014 " + imageCount + " image(s) queued for AVIF optimization";
-    if (videoCount) msg += " \u2014 " + videoCount + " video(s) queued for AV1 transcode";
+    if (videoCount) msg += " \u2014 " + videoCount + " video(s) queued for H.264 transcode";
     if (fail.length) {
       showStatus(ok + " uploaded, " + fail.length + " failed: " + fail.map(f => f.key + " (" + f.error + ")").join(", "), false);
     } else {
@@ -1062,8 +1062,8 @@ const EDITOR_HTML = `<!DOCTYPE html>
     <label>Output:</label>
     <span class="suffix">video/</span>
     <input type="text" id="outputName" placeholder="my-edit" spellcheck="false">
-    <span class="suffix">.webm</span>
-    <button class="btn primary" onclick="doExport()">Export &rarr; AV1+Opus</button>
+    <span class="suffix">.mp4</span>
+    <button class="btn primary" onclick="doExport()">Export &rarr; H.264+AAC</button>
   </div>
 </div>
 
@@ -1400,7 +1400,7 @@ async function doExport(forceOverwrite) {
     showStatus("Name: letters, numbers, dashes, underscores only", false);
     return;
   }
-  var outputKey = "video/" + name + ".webm";
+  var outputKey = "video/" + name + ".mp4";
   var payload = {
     clips: clips.map(function(c) { return { key: c.key, start: c.start, end: c.end }; }),
     output: outputKey,
@@ -1417,7 +1417,7 @@ async function doExport(forceOverwrite) {
     if (data.ok) {
       showStatus("Edit dispatched! Output: " + data.output + " \\u2014 processing via GitHub Actions", true, 15000);
     } else if (data.error === "exists") {
-      if (confirm(name + ".webm already exists in video storage.\\nOverwrite it?")) {
+      if (confirm(name + ".mp4 already exists in video storage.\\nOverwrite it?")) {
         doExport(true);
       }
     } else {

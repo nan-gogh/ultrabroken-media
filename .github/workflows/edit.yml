@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       edit:
-        description: 'JSON: {"clips":[{"key":"...","start":0,"end":-1},...], "output":"video/name.webm"}'
+        description: 'JSON: {"clips":[{"key":"...","start":0,"end":-1},...], "output":"video/name.mp4"}'
         required: true
         type: string
 
@@ -101,24 +101,25 @@ jobs:
           done
 
           echo ""
-          echo "=== Concatenating + Transcoding to AV1+Opus ==="
+          echo "=== Concatenating + Transcoding to H.264+AAC ==="
 
           ffmpeg -f concat -safe 0 -i concat_list.txt \
-            -c:v libsvtav1 -crf 35 -preset 6 \
+            -c:v libx264 -crf 24 -preset slow \
             -vf "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease" \
             -r 30 \
-            -c:a libopus -b:a 96k \
-            -y "output.webm"
+            -c:a aac -b:a 96k \
+            -movflags +faststart \
+            -y "output.mp4"
 
-          OUTPUT_SIZE=$(stat -c%s "output.webm")
+          OUTPUT_SIZE=$(stat -c%s "output.mp4")
           echo "Output size: $(numfmt --to=iec $OUTPUT_SIZE)"
 
           # Upload result
           wrangler r2 object put "ultrabroken-media/$OUTPUT_KEY" \
-            --file="output.webm" --content-type="video/webm" --remote
+            --file="output.mp4" --content-type="video/mp4" --remote
           echo "Uploaded: $OUTPUT_KEY"
 
           # Cleanup
-          rm -f trimmed_*.mkv concat_list.txt output.webm
+          rm -f trimmed_*.mkv concat_list.txt output.mp4
           echo ""
           echo "=== Edit complete ==="

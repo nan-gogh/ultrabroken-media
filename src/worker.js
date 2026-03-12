@@ -2,7 +2,7 @@
  * Ultrabroken Media Worker
  *
  * Serves media files from R2 (public) and provides a management UI
- * at /manage (protected by Cloudflare Access â€” GitHub OAuth).
+ * at /manage (protected by Cloudflare Access - GitHub OAuth).
  *
  * Routes:
  *   GET  /manage           â†’ Management UI (upload, browse, delete)
@@ -386,7 +386,7 @@ const MANAGE_HTML = `<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Ultrabroken Media â€” Manage</title>
+<title>Ultrabroken Media - Manage</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=New+Rocker&family=Texturina:ital,opsz,wght@0,12..44,100..900;1,12..44,100..900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -472,17 +472,18 @@ const MANAGE_HTML = `<!DOCTYPE html>
   /* File list */
   .file-list { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface); }
   .file-row {
-    display: flex; align-items: center; padding: 10px 16px; gap: 12px;
+    display: flex; flex-wrap: wrap; align-items: center; padding: 10px 16px; gap: 4px 12px;
     border-bottom: 1px solid var(--border); font-size: 0.82rem;
     transition: background 0.1s;
   }
   .file-row:last-child { border-bottom: none; }
   .file-row:hover { background: var(--surface2); }
-  .file-row .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--text); cursor: pointer; }
+  .file-row .name { flex: 1 1 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--text); cursor: pointer; }
   .file-row .name:hover { color: var(--accent); }
-  .file-row .size { color: var(--text-dim); white-space: nowrap; text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; }
-  .file-row .date { color: var(--text-dim); white-space: nowrap; text-align: right; font-size: 0.75rem; }
-  .file-row .actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .file-row .meta { display: flex; gap: 12px; align-items: center; flex: 1; min-width: 0; }
+  .file-row .size { color: var(--text-dim); white-space: nowrap; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; }
+  .file-row .date { color: var(--text-dim); white-space: nowrap; font-size: 0.75rem; }
+  .file-row .actions { display: flex; gap: 6px; flex-shrink: 0; margin-left: auto; }
   .file-row .actions .btn[disabled] { opacity: 0.3; pointer-events: none; }
   .badge-transcode {
     display: inline-block; padding: 2px 8px; border-radius: 10px;
@@ -649,8 +650,8 @@ async function loadFiles() {
       var dis = isPending ? ' disabled' : '';
       html += '<div class="file-row">'
         + '<span class="name" onclick="previewFile(\\'' + escAttr(f.key) + '\\')" title="' + escHtml(f.key) + '">' + escHtml(name) + ' ' + badge + '</span>'
-        + '<span class="size">' + size + '</span>'
-        + '<span class="date">' + date + '</span>'
+        + '<span class="meta"><span class="size">' + size + '</span>'
+        + '<span class="date">' + date + '</span></span>'
         + '<span class="actions">'
         + '  <a class="btn" href="/' + encodeURI(f.key) + '" download title="Download"' + dis + '>&#8595;</a>'
         + '  <button class="btn" onclick="copyUrl(\\'' + escAttr(f.key) + '\\')" title="Copy URL"' + dis + '>&#128203;</button>'
@@ -791,7 +792,18 @@ function previewFile(key) {
   overlay.appendChild(close);
   if (isVideo) {
     var vid = document.createElement('video');
-    vid.controls = true; vid.autoplay = true; vid.playsInline = true; vid.muted = true; vid.src = url;
+    vid.controls = true; vid.autoplay = true; vid.playsInline = true; vid.muted = true;
+    vid.onerror = function() {
+      if (overlay.parentNode) {
+        vid.remove();
+        var msg = document.createElement('div');
+        msg.style.cssText = 'text-align:center;color:var(--text);padding:32px;';
+        msg.innerHTML = '<p style="margin-bottom:12px;color:var(--text-dim);">This browser cannot play this video format.</p>'
+          + '<a class="btn" href="' + url + '" download style="font-size:0.85rem;padding:8px 18px;">Download to view</a>';
+        overlay.appendChild(msg);
+      }
+    };
+    vid.src = url;
     overlay.appendChild(vid);
   } else {
     var img = document.createElement('img');

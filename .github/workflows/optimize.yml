@@ -66,7 +66,7 @@ jobs:
             # Convert to AVIF using sharp
             NODE_PATH=/tmp/node_modules node -e "
               const sharp = require('sharp');
-              sharp(process.argv[1]).avif({ quality: 65 }).toFile(process.argv[2]).then(
+              sharp(process.argv[1]).avif({ quality: 50 }).toFile(process.argv[2]).then(
                 info => console.log('Converted:', info.width + 'x' + info.height, info.size + ' bytes'),
                 err => { console.error(err); process.exit(1); }
               );

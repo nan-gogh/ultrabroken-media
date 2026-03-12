@@ -606,9 +606,7 @@ async function loadFiles() {
     }
 
     let html = '<div class="file-list">';
-    var pendingTranscode = allFiles.filter(f => f.transcode === 'pending').length;
-    var pendingOptimize = allFiles.filter(f => f.optimize === 'pending').length;
-    var totalPending = pendingTranscode + pendingOptimize;
+    var totalPending = Math.max(globalPending, allFiles.filter(f => f.transcode === 'pending' || f.optimize === 'pending').length);
     for (const f of allFiles) {
       const name = f.key.slice(currentPrefix.length);
       const size = formatSize(f.size);
@@ -703,6 +701,7 @@ async function uploadFiles(rawFiles) {
     } else {
       showStatus(msg, true);
     }
+    await updateGlobalPending();
     loadFiles();
   } catch (e) {
     showStatus("Upload failed: " + e.message, false);
@@ -819,6 +818,15 @@ async function renameFile(key) {
 }
 
 let refreshTimer = null;
+let globalPending = 0;
+async function updateGlobalPending() {
+  try {
+    const results = await Promise.all(['image/', 'video/'].map(p =>
+      fetch(API + '/list?' + new URLSearchParams({ prefix: p })).then(r => r.json()).catch(() => ({ files: [] }))
+    ));
+    globalPending = results.flatMap(d => d.files || []).filter(f => f.transcode === 'pending' || f.optimize === 'pending').length;
+  } catch { globalPending = 0; }
+}
 function scheduleRefresh() {
   if (refreshTimer) return;
   refreshTimer = setInterval(async () => {
@@ -836,7 +844,7 @@ function scheduleRefresh() {
 // â”€â”€ Init â”€â”€
 const _rawLoadFiles = loadFiles;
 loadFiles = async function() { await _rawLoadFiles(); if (document.querySelector('.badge-transcode')) scheduleRefresh(); };
-loadFiles();
+updateGlobalPending().then(() => loadFiles());
 </script>
 </body>
 </html>`;

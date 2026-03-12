@@ -827,17 +827,60 @@ async function updateGlobalPending() {
     globalPending = results.flatMap(d => d.files || []).filter(f => f.transcode === 'pending' || f.optimize === 'pending').length;
   } catch { globalPending = 0; }
 }
+let lastSnapshot = '';
 function scheduleRefresh() {
   if (refreshTimer) return;
   refreshTimer = setInterval(async () => {
-    if (!document.querySelector('.badge-transcode')) {
+    var c = document.getElementById('fileListContainer');
+    if (!c.querySelector('.badge-transcode')) {
       clearInterval(refreshTimer);
       refreshTimer = null;
+      lastSnapshot = '';
       return;
     }
-    container.style.minHeight = container.offsetHeight + 'px';
-    await loadFiles();
-    container.style.minHeight = '';
+    try {
+      let allFiles = [], cursor = null;
+      do {
+        const params = new URLSearchParams({ prefix: currentPrefix });
+        if (cursor) params.set('cursor', cursor);
+        const data = await fetch(API + '/list?' + params).then(r => r.json());
+        allFiles = allFiles.concat(data.files);
+        cursor = data.truncated ? data.cursor : null;
+      } while (cursor);
+      const snap = allFiles.map(f => f.key + ':' + (f.transcode || '') + (f.optimize || '')).join(',');
+      if (snap === lastSnapshot) return;
+      lastSnapshot = snap;
+      const fileMap = new Map(allFiles.map(f => [f.key, f]));
+      const rows = c.querySelectorAll('.file-row');
+      const totalPending = Math.max(globalPending, allFiles.filter(f => f.transcode === 'pending' || f.optimize === 'pending').length);
+      if (rows.length !== allFiles.length) {
+        c.style.minHeight = c.offsetHeight + 'px';
+        await loadFiles();
+        c.style.minHeight = '';
+        return;
+      }
+      rows.forEach(row => {
+        const key = row.querySelector('.name').title;
+        const f = fileMap.get(key);
+        if (!f) return;
+        const isPending = f.transcode === 'pending' || f.optimize === 'pending';
+        const badge = row.querySelector('.badge-transcode');
+        if (badge && !isPending) {
+          const size = formatSize(f.size);
+          const date = new Date(f.uploaded).toLocaleDateString();
+          const meta = document.createElement('span');
+          meta.className = 'meta';
+          meta.innerHTML = '<span class="size">' + size + '</span><span class="date">' + date + '</span>';
+          badge.replaceWith(meta);
+          row.querySelectorAll('.actions .btn[disabled]').forEach(b => b.removeAttribute('disabled'));
+        } else if (badge) {
+          const txt = f.transcode === 'pending'
+            ? (totalPending > 1 ? '\\u23F3 transcoding queued' : '\\u23F3 transcoding')
+            : (totalPending > 1 ? '\\u23F3 optimizing queued' : '\\u23F3 optimizing');
+          if (badge.textContent !== txt) badge.textContent = txt;
+        }
+      });
+    } catch (e) { console.warn('refresh tick:', e); }
   }, 10000);
 }
 

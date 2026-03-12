@@ -830,14 +830,52 @@ async function updateGlobalPending() {
 function scheduleRefresh() {
   if (refreshTimer) return;
   refreshTimer = setInterval(async () => {
-    var c = document.getElementById('fileListContainer');
-    c.style.minHeight = c.offsetHeight + 'px';
-    await loadFiles();
-    c.style.minHeight = '';
-    if (!c.querySelector('.badge-transcode')) {
-      clearInterval(refreshTimer);
-      refreshTimer = null;
-    }
+    try {
+      var c = document.getElementById('fileListContainer');
+      let allFiles = [], cursor = null;
+      do {
+        const params = new URLSearchParams({ prefix: currentPrefix });
+        if (cursor) params.set('cursor', cursor);
+        const data = await fetch(API + '/list?' + params).then(r => r.json());
+        allFiles = allFiles.concat(data.files);
+        cursor = data.truncated ? data.cursor : null;
+      } while (cursor);
+      const fileMap = new Map(allFiles.map(f => [f.key, f]));
+      const rows = c.querySelectorAll('.file-row');
+      const totalPending = Math.max(globalPending, allFiles.filter(f => f.transcode === 'pending' || f.optimize === 'pending').length);
+      let rebuild = rows.length !== allFiles.length;
+      if (!rebuild) rows.forEach(row => {
+        if (!fileMap.has(row.querySelector('.name').title)) rebuild = true;
+      });
+      if (rebuild) {
+        c.style.minHeight = c.offsetHeight + 'px';
+        await _rawLoadFiles();
+        c.style.minHeight = '';
+      } else {
+        rows.forEach(row => {
+          const f = fileMap.get(row.querySelector('.name').title);
+          if (!f) return;
+          const isPending = f.transcode === 'pending' || f.optimize === 'pending';
+          const badge = row.querySelector('.badge-transcode');
+          if (badge && !isPending) {
+            const meta = document.createElement('span');
+            meta.className = 'meta';
+            meta.innerHTML = '<span class="size">' + formatSize(f.size) + '</span><span class="date">' + new Date(f.uploaded).toLocaleDateString() + '</span>';
+            badge.replaceWith(meta);
+            row.querySelectorAll('.actions .btn[disabled]').forEach(b => b.removeAttribute('disabled'));
+          } else if (badge) {
+            const txt = f.transcode === 'pending'
+              ? (totalPending > 1 ? '\\u23F3 transcoding queued' : '\\u23F3 transcoding')
+              : (totalPending > 1 ? '\\u23F3 optimizing queued' : '\\u23F3 optimizing');
+            if (badge.textContent !== txt) badge.textContent = txt;
+          }
+        });
+      }
+      if (!c.querySelector('.badge-transcode')) {
+        clearInterval(refreshTimer);
+        refreshTimer = null;
+      }
+    } catch (e) { console.warn('refresh tick:', e); }
   }, 10000);
 }
 

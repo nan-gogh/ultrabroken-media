@@ -939,9 +939,7 @@ const EDITOR_HTML = `<!DOCTYPE html>
   .library-row .name:hover { color: var(--accent); }
   .library-row .size { color: var(--text-dim); font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; min-width: 60px; text-align: right; }
 
-  .mini-upload { padding: 14px 16px; border-top: 1px solid var(--border); text-align: center; cursor: pointer; color: var(--text-dim); font-size: 0.78rem; transition: color 0.15s; }
-  .mini-upload:hover { color: var(--accent); }
-  .mini-upload.dragover { background: rgba(0,240,194,0.05); color: var(--accent); }
+
 
   .timeline { padding: 12px; min-height: 60px; display: flex; gap: 8px; overflow-x: auto; flex-wrap: wrap; }
   .timeline:empty::after { content: 'Add clips from the library above'; color: var(--text-dim); font-size: 0.82rem; width: 100%; text-align: center; padding: 20px; }
@@ -1037,10 +1035,6 @@ const EDITOR_HTML = `<!DOCTYPE html>
   </div>
   <div class="library-list" id="libraryList">
     <div style="padding:20px;text-align:center;color:var(--text-dim);font-size:0.82rem;">Loading\u2026</div>
-  </div>
-  <div class="mini-upload" id="miniUpload">
-    <strong>+ Upload local file</strong> (or drag here)
-    <input type="file" id="localFileInput" multiple hidden accept="video/*">
   </div>
 </div>
 
@@ -1354,46 +1348,13 @@ function onDragEnd(e) {
   });
 }
 
-// ── Local upload ──
-var miniUploadEl = document.getElementById("miniUpload");
-var localFileInput = document.getElementById("localFileInput");
-miniUploadEl.addEventListener("click", function(e) {
-  if (e.target === localFileInput) return;
-  localFileInput.click();
-});
-miniUploadEl.addEventListener("dragover", function(e) { e.preventDefault(); miniUploadEl.classList.add("dragover"); });
-miniUploadEl.addEventListener("dragleave", function() { miniUploadEl.classList.remove("dragover"); });
-miniUploadEl.addEventListener("drop", function(e) {
-  e.preventDefault();
-  miniUploadEl.classList.remove("dragover");
-  uploadLocalFiles(e.dataTransfer.files);
-});
-localFileInput.addEventListener("change", function() { uploadLocalFiles(localFileInput.files); });
-
-async function uploadLocalFiles(rawFiles) {
-  if (!rawFiles.length) return;
-  var files = Array.from(rawFiles).filter(function(f) { return f.type.startsWith("video/"); });
-  if (files.length === 0) { showStatus("Only video files accepted", false); return; }
-  var form = new FormData();
-  form.set("prefix", "video/");
-  form.set("skipWorkflow", "true");
-  for (var i = 0; i < files.length; i++) form.append("file", files[i]);
-  try {
-    showStatus("Uploading " + files.length + " file(s)\\u2026", true);
-    var res = await fetch(API + "/upload", { method: "POST", body: form });
-    var data = await res.json();
-    var ok = data.results.filter(function(r) { return r.ok; }).length;
-    showStatus(ok + " file(s) uploaded to R2", true, 5000);
-    loadLibrary();
-  } catch (e) {
-    showStatus("Upload failed: " + e.message, false);
-  }
-  localFileInput.value = "";
-}
-
 // ── Export ──
 async function doExport(forceOverwrite) {
   if (clips.length === 0) { showStatus("Add at least one clip to the timeline", false); return; }
+  if (clips.length === 1 && clips[0].start <= 0 && clips[0].end === -1) {
+    showStatus("Nothing to render \u2014 single untrimmed clip. Use Rename on the manage page instead.", false);
+    return;
+  }
   var name = document.getElementById("outputName").value.trim();
   if (!name) { showStatus("Enter an output name", false); return; }
   if (!/^[a-zA-Z0-9_-]+$/.test(name)) {

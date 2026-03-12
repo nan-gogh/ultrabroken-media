@@ -77,16 +77,13 @@ jobs:
 
             # Build trim arguments
             TRIM_ARGS=""
-            HAS_TRIM=false
 
             if [ "$(echo "$START > 0" | bc -l)" -eq 1 ]; then
               TRIM_ARGS="-ss $START"
-              HAS_TRIM=true
             fi
 
             if [ "$END" != "-1" ]; then
               TRIM_ARGS="$TRIM_ARGS -to $END"
-              HAS_TRIM=true
             fi
 
             # Re-encode trim to intermediate (frame-accurate cuts, avoids frozen frames)

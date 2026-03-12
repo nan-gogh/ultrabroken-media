@@ -12,7 +12,7 @@ Cloudflare Worker + R2 backend for hosting media assets (screenshots, video clip
 
 ```
 screens/   → Screenshots (AVIF)
-video/     → Video clips (AV1+Opus WebM)
+video/     → Video clips (H.264+AAC MP4)
 social/    → Social card PNGs
 ```
 

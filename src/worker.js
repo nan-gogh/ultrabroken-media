@@ -835,9 +835,47 @@ function scheduleRefresh() {
       refreshTimer = null;
       return;
     }
-    const scrollY = window.scrollY;
-    await loadFiles();
-    window.scrollTo({ top: scrollY, behavior: 'instant' });
+    try {
+      let allFiles = [], cursor = null;
+      do {
+        const params = new URLSearchParams({ prefix: currentPrefix });
+        if (cursor) params.set('cursor', cursor);
+        const data = await fetch(API + '/list?' + params).then(r => r.json());
+        allFiles = allFiles.concat(data.files);
+        cursor = data.truncated ? data.cursor : null;
+      } while (cursor);
+      const fileMap = new Map(allFiles.map(f => [f.key, f]));
+      const rows = container.querySelectorAll('.file-row');
+      const rowKeys = new Set();
+      const totalPending = allFiles.filter(f => f.transcode === 'pending' || f.optimize === 'pending').length;
+      let needsFullRefresh = false;
+      rows.forEach(row => {
+        const nameEl = row.querySelector('.name');
+        const key = nameEl ? nameEl.title : null;
+        if (!key || !fileMap.has(key)) { needsFullRefresh = true; return; }
+        rowKeys.add(key);
+        const f = fileMap.get(key);
+        const isPending = f.transcode === 'pending' || f.optimize === 'pending';
+        const hadBadge = !!row.querySelector('.badge-transcode');
+        if (hadBadge && !isPending) {
+          const size = formatSize(f.size);
+          const date = new Date(f.uploaded).toLocaleDateString();
+          const oldMeta = row.querySelector('.badge-transcode');
+          const newMeta = document.createElement('span');
+          newMeta.className = 'meta';
+          newMeta.innerHTML = '<span class="size">' + size + '</span><span class="date">' + date + '</span>';
+          oldMeta.replaceWith(newMeta);
+          row.querySelectorAll('.actions .btn[disabled]').forEach(b => b.removeAttribute('disabled'));
+        } else if (hadBadge && isPending) {
+          const badge = row.querySelector('.badge-transcode');
+          const badgeText = f.transcode === 'pending'
+            ? (totalPending > 1 ? '\\u23F3 transcoding queued' : '\\u23F3 transcoding')
+            : (totalPending > 1 ? '\\u23F3 optimizing queued' : '\\u23F3 optimizing');
+          if (badge.textContent !== badgeText) badge.textContent = badgeText;
+        }
+      });
+      if (needsFullRefresh || rowKeys.size !== allFiles.length) loadFiles();
+    } catch {}
   }, 10000);
 }
 

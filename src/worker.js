@@ -621,7 +621,7 @@ async function loadFiles() {
         + metaHtml
         + '<span class="actions">'
         + '  <a class="btn" href="/' + encodeURI(f.key) + '" download title="Download"' + dis + '>&#8595;</a>'
-        + '  <button class="btn" onclick="copyUrl(\\'' + escAttr(f.key) + '\\')" title="Copy URL"' + dis + '>🗒</button>'
+        + '  <button class="btn" onclick="copyUrl(\\'' + escAttr(f.key) + '\\')" title="Copy URL"' + dis + '>⿻</button>'
         + '  <button class="btn" onclick="renameFile(\\'' + escAttr(f.key) + '\\')" title="Rename"' + dis + '>&#9998;</button>'
         + '  <button class="btn danger" onclick="deleteFile(\\'' + escAttr(f.key) + '\\')" title="Delete">&#10005;</button>'
         + '</span></div>';
@@ -759,11 +759,14 @@ function previewFile(key) {
   var isVideo = /\\.(mp4|mov|webm|mkv)$/i.test(key);
   var overlay = document.createElement('div');
   overlay.className = 'preview-overlay';
-  overlay.onclick = function(e) { if (e.target === overlay) document.body.removeChild(overlay); };
+  overlay.onclick = function(e) { if (e.target === overlay) closeOverlay(); };
+  function closeOverlay() { if (overlay.parentNode) document.body.removeChild(overlay); document.removeEventListener('keydown', onKey); }
+  function onKey(e) { if (e.key === 'Escape') closeOverlay(); }
+  document.addEventListener('keydown', onKey);
   var close = document.createElement('button');
   close.className = 'close-btn';
   close.innerHTML = '&times;';
-  close.onclick = function() { document.body.removeChild(overlay); };
+  close.onclick = closeOverlay;
   overlay.appendChild(close);
   if (isVideo) {
     var vid = document.createElement('video');

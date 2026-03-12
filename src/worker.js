@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Ultrabroken Media Worker
  *
  * Serves media files from R2 (public) and provides a management UI
@@ -369,7 +369,6 @@ export default {
     if (path === "/manage/api/rename" && request.method === "POST") {
       return handleRename(request, env);
     }
-
     // Public file serving
     if (request.method === "GET" || request.method === "HEAD") {
       return handleGet(request, env);
@@ -443,7 +442,6 @@ const MANAGE_HTML = `<!DOCTYPE html>
     background: var(--surface); color: var(--accent);
     border-color: var(--border); border-bottom-color: var(--surface);
   }
-
   /* Upload zone */
   .upload-zone {
     border: 2px dashed var(--border); border-radius: 8px; padding: 44px;
@@ -457,11 +455,6 @@ const MANAGE_HTML = `<!DOCTYPE html>
   }
   .upload-zone p { color: var(--text-dim); font-size: 0.9rem; }
   .upload-zone p strong { color: var(--accent); }
-  .upload-zone .img-dest { display: inline-flex; gap: 0; margin-top: 8px; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; }
-  .upload-zone .img-dest button { background: transparent; color: var(--text-dim); border: none; padding: 4px 12px; cursor: pointer; transition: background 0.15s, color 0.15s; }
-  .upload-zone .img-dest button.active { background: var(--accent); color: var(--bg); }
-  .upload-zone .img-dest button:not(.active):hover { color: var(--text); }
-
   /* Prefix selector */
 
   /* File list */
@@ -552,10 +545,7 @@ const MANAGE_HTML = `<!DOCTYPE html>
 
 <div class="upload-zone" id="dropzone">
   <p><strong>Drop files here</strong> or click to browse</p>
-  <p style="margin-top:6px;font-size:0.78rem;">Videos &rarr; <code>video/</code> (H.264 transcode) &nbsp;&bull;&nbsp; Images &darr;</p>
-  <div class="img-dest" onclick="event.stopPropagation()">
-    <button class="active" onclick="setImgDest('image/')">image/</button>
-  </div>
+  <p style="margin-top:6px;font-size:0.78rem;color:var(--text-dim);">Videos &rarr; <code>video/</code> (H.264 transcode) &nbsp;&bull;&nbsp; Images &rarr; <code>image/</code> (AVIF optimize)</p>
   <input type="file" id="fileInput" multiple hidden>
 </div>
 
@@ -574,13 +564,6 @@ const MANAGE_HTML = `<!DOCTYPE html>
 <script>
 const API = "/manage/api";
 let currentPrefix = "image/";
-let imgDest = "image/";
-
-function setImgDest(dest) {
-  imgDest = dest;
-  document.querySelectorAll('.img-dest button').forEach(b =>
-    b.classList.toggle('active', b.textContent.trim() === dest));
-}
 
 // â”€â”€ Tab switching â”€â”€
 function switchTab(prefix) {
@@ -588,6 +571,10 @@ function switchTab(prefix) {
   document.querySelectorAll(".tabs button").forEach(b =>
     b.classList.toggle("active", b.textContent.trim() === prefix));
   loadFiles();
+}
+
+  showStatus("Migrated " + data.migrated + " file(s) to image/", true);
+  if (currentPrefix === "image/") loadFiles();
 }
 
 // â”€â”€ Status messages â”€â”€
@@ -638,7 +625,7 @@ async function loadFiles() {
         + metaHtml
         + '<span class="actions">'
         + '  <a class="btn" href="/' + encodeURI(f.key) + '" download title="Download"' + dis + '>&#8595;</a>'
-        + '  <button class="btn" onclick="copyUrl(\\'' + escAttr(f.key) + '\\')" title="Copy URL"' + dis + '>&#128203;</button>'
+        + '  <button class="btn" onclick="copyUrl(\\'' + escAttr(f.key) + '\\')" title="Copy URL"' + dis + '>🗒</button>'
         + '  <button class="btn" onclick="renameFile(\\'' + escAttr(f.key) + '\\')" title="Rename"' + dis + '>&#9998;</button>'
         + '  <button class="btn danger" onclick="deleteFile(\\'' + escAttr(f.key) + '\\')" title="Delete">&#10005;</button>'
         + '</span></div>';
@@ -694,7 +681,7 @@ async function uploadFiles(rawFiles) {
   }
   if (images.length) {
     const form = new FormData();
-    form.set("prefix", imgDest);
+    form.set("prefix", "image/");
     for (const f of images) form.append("file", f);
     uploads.push(fetch(API + "/upload", { method: "POST", body: form }).then(r => r.json()));
   }

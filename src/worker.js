@@ -573,10 +573,6 @@ function switchTab(prefix) {
   loadFiles();
 }
 
-  showStatus("Migrated " + data.migrated + " file(s) to image/", true);
-  if (currentPrefix === "image/") loadFiles();
-}
-
 // â”€â”€ Status messages â”€â”€
 let statusTimer = null;
 function showStatus(msg, ok, duration) {

@@ -80,7 +80,10 @@ jobs:
             if [ $new_size -gt $original_size ]; then
               echo "AVIF is larger ($new_size > $original_size), keeping original"
               rm "output.avif"
-              # Don't upload; original remains on R2
+              # Re-upload original without pending metadata to clear the badge
+              wrangler r2 object put "ultrabroken-media/$key" \
+                --file="input.$ext_lower" --remote
+              echo "Re-uploaded original to clear pending flag: $key"
             else
               # Upload AVIF version
               wrangler r2 object put "ultrabroken-media/$out_key" \

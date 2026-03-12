@@ -1348,6 +1348,57 @@ function onDragEnd(e) {
   });
 }
 
+// ── Touch drag to reorder (mobile) ──
+var touchDragIndex = null;
+var touchLongPress = null;
+var touchDragging = false;
+
+document.getElementById("timeline").addEventListener("touchstart", function(e) {
+  var card = e.target.closest(".clip-card");
+  if (!card) return;
+  var idx = parseInt(card.getAttribute("data-index"));
+  touchLongPress = setTimeout(function() {
+    touchDragIndex = idx;
+    touchDragging = true;
+    card.classList.add("dragging");
+  }, 300);
+}, { passive: true });
+
+document.getElementById("timeline").addEventListener("touchmove", function(e) {
+  if (!touchDragging) { clearTimeout(touchLongPress); return; }
+  e.preventDefault();
+  var touch = e.touches[0];
+  var el = document.elementFromPoint(touch.clientX, touch.clientY);
+  if (!el) return;
+  var card = el.closest(".clip-card");
+  document.querySelectorAll(".clip-card").forEach(function(c) { c.classList.remove("dragover"); });
+  if (card) card.classList.add("dragover");
+}, { passive: false });
+
+document.getElementById("timeline").addEventListener("touchend", function(e) {
+  clearTimeout(touchLongPress);
+  if (!touchDragging) return;
+  var touch = e.changedTouches[0];
+  var el = document.elementFromPoint(touch.clientX, touch.clientY);
+  var card = el ? el.closest(".clip-card") : null;
+  if (card) {
+    var targetIndex = parseInt(card.getAttribute("data-index"));
+    if (touchDragIndex !== null && touchDragIndex !== targetIndex) {
+      var moved = clips.splice(touchDragIndex, 1)[0];
+      clips.splice(targetIndex, 0, moved);
+      if (selectedIndex === touchDragIndex) selectedIndex = targetIndex;
+      else if (touchDragIndex < selectedIndex && targetIndex >= selectedIndex) selectedIndex--;
+      else if (touchDragIndex > selectedIndex && targetIndex <= selectedIndex) selectedIndex++;
+      renderTimeline();
+    }
+  }
+  touchDragIndex = null;
+  touchDragging = false;
+  document.querySelectorAll(".clip-card").forEach(function(c) {
+    c.classList.remove("dragging", "dragover");
+  });
+});
+
 // ── Export ──
 async function doExport(forceOverwrite) {
   if (clips.length === 0) { showStatus("Add at least one clip to the timeline", false); return; }

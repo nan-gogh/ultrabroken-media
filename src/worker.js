@@ -853,7 +853,13 @@ function scheduleRefresh() {
       const fileMap = new Map(allFiles.map(f => [f.key, f]));
       const rows = c.querySelectorAll('.file-row');
       const totalPending = Math.max(globalPending, allFiles.filter(f => f.transcode === 'pending' || f.optimize === 'pending').length);
-      if (rows.length !== allFiles.length) {
+      let needsRebuild = rows.length !== allFiles.length;
+      if (!needsRebuild) {
+        rows.forEach(row => {
+          if (!fileMap.has(row.querySelector('.name').title)) needsRebuild = true;
+        });
+      }
+      if (needsRebuild) {
         c.style.minHeight = c.offsetHeight + 'px';
         await loadFiles();
         c.style.minHeight = '';

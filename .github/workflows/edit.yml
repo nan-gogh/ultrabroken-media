@@ -104,10 +104,10 @@ jobs:
           echo "=== Concatenating + Transcoding to H.264+AAC ==="
 
           ffmpeg -f concat -safe 0 -i concat_list.txt \
-            -c:v libx264 -crf 24 -preset slow \
-            -vf "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease" \
-            -r 30 \
-            -c:a aac -b:a 96k \
+            -c:v libx264 -crf 30 -preset slow \
+            -vf "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease" \
+            -r 24 \
+            -c:a aac -b:a 64k \
             -movflags +faststart \
             -y "output.mp4"
 

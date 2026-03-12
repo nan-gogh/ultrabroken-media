@@ -132,7 +132,7 @@ async function handleUpload(request, env) {
     const putOptions = {
       httpMetadata: { contentType: value.type || getMime(key) },
     };
-    if (!skipWorkflow && /\.(mov|mkv|webm)$/i.test(key)) {
+    if (!skipWorkflow && /\.(mp4|mov|mkv|webm)$/i.test(key)) {
       putOptions.customMetadata = { transcode: 'pending' };
     } else if (!skipWorkflow && /\.(png|jpe?g|webp|bmp|tiff?)$/i.test(key)) {
       putOptions.customMetadata = { optimize: 'pending' };
@@ -144,9 +144,9 @@ async function handleUpload(request, env) {
 
   // Dispatch optimization/transcode workflows
   const dispatches = [];
-  const videoUploaded = results.some(r => r.ok && /\.(mov|mkv|webm)$/i.test(r.key));
+  const videoUploaded = results.some(r => r.ok && /\.(mp4|mov|mkv|webm)$/i.test(r.key));
   if (!skipWorkflow && videoUploaded && env.GITHUB_TOKEN) {
-    const videoKeys = results.filter(r => r.ok && /\.(mov|mkv|webm)$/i.test(r.key)).map(r => r.key);
+    const videoKeys = results.filter(r => r.ok && /\.(mp4|mov|mkv|webm)$/i.test(r.key)).map(r => r.key);
     try {
       const resp = await fetch('https://api.github.com/repos/' + (env.GITHUB_REPO || 'nan-gogh/ultrabroken-media') + '/actions/workflows/transcode.yml/dispatches', {
         method: 'POST',

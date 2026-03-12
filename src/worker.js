@@ -442,6 +442,10 @@ const MANAGE_HTML = `<!DOCTYPE html>
     background: var(--surface); color: var(--accent);
     border-color: var(--border); border-bottom-color: var(--surface);
   }
+  /* Queue banner */
+  #queue-banner { display: none; background: rgba(255,180,0,0.07); border: 1px solid rgba(255,180,0,0.28); border-radius: 6px; padding: 7px 14px; margin-bottom: 12px; font-size: 0.78rem; color: #c8a444; text-align: center; letter-spacing: 0.01em; }
+  #queue-banner.active { display: block; }
+
   /* Upload zone */
   .upload-zone {
     border: 2px dashed var(--border); border-radius: 8px; padding: 44px;
@@ -543,6 +547,7 @@ const MANAGE_HTML = `<!DOCTYPE html>
   </div>
 </header>
 
+<div id="queue-banner"></div>
 <div class="upload-zone" id="dropzone">
   <p><strong>Drop files here</strong> or click to browse</p>
   <p style="margin-top:6px;font-size:0.78rem;color:var(--text-dim);">Videos &rarr; <code>video/</code> (H.264 transcode) &nbsp;&bull;&nbsp; Images &rarr; <code>image/</code> (AVIF optimize)</p>
@@ -698,6 +703,7 @@ async function uploadFiles(rawFiles) {
       showStatus(msg, true);
     }
     loadFiles();
+    checkQueue();
   } catch (e) {
     showStatus("Upload failed: " + e.message, false);
   }
@@ -815,6 +821,25 @@ async function renameFile(key) {
 let refreshTimer = null;
 let refreshCount = 0;
 const MAX_REFRESHES = 30; // stop after ~5 min
+async function checkQueue() {
+  const prefixes = ['image/', 'video/', 'social/'];
+  const counts = await Promise.all(prefixes.map(async p => {
+    try {
+      const res = await fetch(API + '/list?' + new URLSearchParams({ prefix: p }));
+      const data = await res.json();
+      return (data.files || []).filter(f => f.transcode === 'pending' || f.optimize === 'pending').length;
+    } catch { return 0; }
+  }));
+  const total = counts.reduce((a, b) => a + b, 0);
+  const banner = document.getElementById('queue-banner');
+  if (total > 0) {
+    banner.textContent = '\u23F3 ' + total + ' file' + (total > 1 ? 's' : '') + ' processing \u2014 new uploads will be queued after';
+    banner.classList.add('active');
+  } else {
+    banner.classList.remove('active');
+  }
+}
+
 function scheduleRefresh() {
   if (refreshTimer) return;
   refreshCount = 0;
@@ -824,6 +849,7 @@ function scheduleRefresh() {
     const scrollY = container.scrollTop;
     await loadFiles();
     container.scrollTop = scrollY;
+    checkQueue();
     if (!document.querySelector('.badge-transcode') || refreshCount >= MAX_REFRESHES) {
       clearInterval(refreshTimer);
       refreshTimer = null;
@@ -840,6 +866,7 @@ loadFiles = async function() {
 
 // â”€â”€ Init â”€â”€
 loadFiles();
+checkQueue();
 </script>
 </body>
 </html>`;

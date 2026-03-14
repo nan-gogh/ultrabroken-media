@@ -100,9 +100,25 @@ jobs:
           echo ""
           echo "=== Concatenating + Transcoding to H.264+AAC ==="
 
+          # Build video filter chain
+          VF="scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease"
+
+          # Add text overlays if present
+          OVERLAY_COUNT=$(echo "$EDIT_JSON" | jq '.overlays | length // 0')
+          if [ "$OVERLAY_COUNT" -gt 0 ]; then
+            echo "Text overlays: $OVERLAY_COUNT"
+            for oi in $(seq 0 $(( OVERLAY_COUNT - 1 ))); do
+              OV_TEXT=$(echo "$EDIT_JSON" | jq -r ".overlays[$oi].text")
+              OV_START=$(echo "$EDIT_JSON" | jq -r ".overlays[$oi].start")
+              OV_END=$(echo "$EDIT_JSON" | jq -r ".overlays[$oi].end")
+              echo "  Overlay $((oi+1)): \"$OV_TEXT\" ${OV_START}s\u2013${OV_END}s"
+              VF="${VF},drawtext=text='${OV_TEXT}':enable='between(t,${OV_START},${OV_END})':fontsize=36:fontcolor=white:x=(w-tw)/2:y=h-th-40:box=1:boxcolor=black@0.5:boxborderw=8"
+            done
+          fi
+
           ffmpeg -f concat -safe 0 -i concat_list.txt \
             -c:v libx264 -crf 30 -preset slow \
-            -vf "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease" \
+            -vf "$VF" \
             -r 24 \
             -c:a aac -b:a 64k \
             -movflags +faststart \

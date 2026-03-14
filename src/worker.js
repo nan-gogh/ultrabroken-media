@@ -219,7 +219,7 @@ async function handlePurge(request, env) {
 
 async function handleEdit(request, env) {
   const body = await request.json();
-  const { clips, output, force } = body;
+  const { clips, output, force, overlays } = body;
 
   if (!clips || !Array.isArray(clips) || clips.length === 0) {
     return Response.json({ error: "No clips provided" }, { status: 400 });
@@ -246,6 +246,23 @@ async function handleEdit(request, env) {
     }
   }
 
+  // Validate text overlays
+  const safeOverlays = [];
+  if (overlays && Array.isArray(overlays)) {
+    for (const ov of overlays) {
+      if (typeof ov.text !== 'string' || ov.text.trim().length === 0) continue;
+      if (typeof ov.start !== 'number' || ov.start < 0) {
+        return Response.json({ error: "Invalid overlay start time" }, { status: 400 });
+      }
+      if (typeof ov.end !== 'number' || ov.end <= ov.start) {
+        return Response.json({ error: "Invalid overlay end time" }, { status: 400 });
+      }
+      // Sanitize text for ffmpeg drawtext (escape special chars)
+      const safeText = ov.text.trim().replace(/\\/g, '\\\\\\\\').replace(/'/g, "\u2019").replace(/:/g, '\\\\:').replace(/%/g, '%%%%');
+      safeOverlays.push({ text: safeText, start: ov.start, end: ov.end });
+    }
+  }
+
   // Check for existing file unless force overwrite
   if (!force) {
     const existing = await env.MEDIA.head(outputKey);
@@ -264,7 +281,7 @@ async function handleEdit(request, env) {
     return Response.json({ error: "GITHUB_TOKEN not configured" }, { status: 500 });
   }
 
-  const editPayload = JSON.stringify({ clips, output: outputKey });
+  const editPayload = JSON.stringify({ clips, output: outputKey, overlays: safeOverlays });
 
   try {
     const resp = await fetch(
@@ -989,6 +1006,17 @@ const EDITOR_HTML = `<!DOCTYPE html>
   .clip-card .clip-actions { display: flex; gap: 4px; }
   .clip-card .clip-actions button { padding: 2px 8px; font-size: 0.7rem; }
 
+  .overlay-list { padding: 12px; }
+  .overlay-list:empty::after { content: 'No text overlays yet'; color: var(--text-dim); font-size: 0.82rem; display: block; text-align: center; padding: 12px; }
+  .overlay-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .overlay-row:last-child { border-bottom: none; }
+  .overlay-row input[type="text"] { flex: 1; min-width: 120px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; color: var(--text); padding: 4px 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; }
+  .overlay-row input[type="text"]:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+  .overlay-row input[type="number"] { width: 58px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; color: var(--text); padding: 4px 6px; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; text-align: center; }
+  .overlay-row input[type="number"]:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+  .overlay-row .ov-label { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: var(--text-dim); }
+  .overlay-total { padding: 6px 12px; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--text-dim); text-align: right; }
+
   /* Global clip editor panel */
   .clip-editor { padding: 16px; }
   .clip-editor .empty-msg { text-align: center; padding: 12px; color: var(--text-dim); font-size: 0.82rem; }
@@ -1075,6 +1103,14 @@ const EDITOR_HTML = `<!DOCTYPE html>
 </div>
 
 <div class="section">
+  <div class="section-header">
+    <span>Text Overlays</span>
+    <span style="margin-left:auto;display:flex;gap:6px;align-items:center;"><span id="overlayTotal" class="overlay-total"></span><button class="btn" onclick="addOverlay()">+ Add Text</button></span>
+  </div>
+  <div class="overlay-list" id="overlayList"></div>
+</div>
+
+<div class="section">
   <div class="section-header">Timeline <span id="clipCount" style="margin-left:auto;"></span></div>
   <div class="timeline" id="timeline"></div>
 </div>
@@ -1097,6 +1133,8 @@ var clips = [];
 var nextClipId = 1;
 var dragSrcIndex = null;
 var selectedIndex = -1;
+var overlays = [];
+var nextOverlayId = 1;
 
 // ── Status ──
 var statusTimer = null;
@@ -1186,6 +1224,7 @@ function addClip(key) {
     }
     renderTimeline();
     if (selectedIndex >= 0 && selectedIndex < clips.length && clips[selectedIndex].id === clipId) renderEditor();
+    renderOverlayTotal();
   });
 }
 
@@ -1215,7 +1254,7 @@ function renderTimeline() {
       + 'ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)">'
       + '<div class="clip-name" title="' + escHtml(c.key) + '" onclick="event.stopPropagation();previewClip(\\'' + escAttr(c.key) + '\\', ' + c.start + ')">' + escHtml(c.name) + '</div>'
       + '<div class="clip-mini-bar"><div class="clip-mini-fill" style="left:' + startPct + '%;width:' + widthPct + '%;"></div></div>'
-      + '<div class="clip-meta">' + (trimDur || "?") + '</div>'
+      + '<div class="clip-meta">' + (c.duration > 0 ? fmtTime(c.start) + ' \u2192 ' + fmtTime(endVal) + ' \u00b7 ' : '') + (trimDur || '?') + '</div>'
       + '<div class="clip-actions">'
       + '<button class="btn danger" onclick="event.stopPropagation();removeClip(' + i + ')">&times;</button>'
       + '</div></div>';
@@ -1328,7 +1367,7 @@ function patchTimelineCard(i, c, maxVal) {
   var bar = card.querySelector('.clip-mini-fill');
   if (bar) { bar.style.left = startPct + '%'; bar.style.width = widthPct + '%'; }
   var meta = card.querySelector('.clip-meta');
-  if (meta) meta.textContent = c.duration > 0 ? (endVal - c.start).toFixed(1) + 's' : '?';
+  if (meta) meta.textContent = c.duration > 0 ? fmtTime(c.start) + ' \u2192 ' + fmtTime(endVal) + ' \u00b7 ' + (endVal - c.start).toFixed(1) + 's' : '?';
 }
 
 function removeClip(i) {
@@ -1337,6 +1376,72 @@ function removeClip(i) {
   else if (selectedIndex > i) selectedIndex--;
   renderTimeline();
   renderEditor();
+  renderOverlayTotal();
+}
+
+// \u2500\u2500 Text Overlays \u2500\u2500
+function getTotalDuration() {
+  var total = 0;
+  for (var i = 0; i < clips.length; i++) {
+    var c = clips[i];
+    var maxVal = c.duration > 0 ? c.duration : 0;
+    var endVal = (c.end === -1 || c.end > maxVal) ? maxVal : c.end;
+    total += endVal - c.start;
+  }
+  return Math.round(total * 10) / 10;
+}
+
+function renderOverlayTotal() {
+  var el = document.getElementById('overlayTotal');
+  var dur = getTotalDuration();
+  el.textContent = dur > 0 ? 'Total: ' + fmtTime(dur) : '';
+}
+
+function addOverlay() {
+  overlays.push({ id: nextOverlayId++, text: '', start: 0, end: Math.min(3, getTotalDuration() || 3) });
+  renderOverlays();
+}
+
+function removeOverlay(i) {
+  overlays.splice(i, 1);
+  renderOverlays();
+}
+
+function onOverlayChange(i, field, val) {
+  if (i < 0 || i >= overlays.length) return;
+  var ov = overlays[i];
+  if (field === 'text') {
+    ov.text = val;
+  } else {
+    var v = parseFloat(val);
+    if (isNaN(v) || v < 0) return;
+    if (field === 'start') {
+      if (v >= ov.end) v = Math.max(0, ov.end - 0.1);
+      ov.start = Math.round(v * 10) / 10;
+    } else {
+      if (v <= ov.start) v = ov.start + 0.1;
+      ov.end = Math.round(v * 10) / 10;
+    }
+  }
+}
+
+function renderOverlays() {
+  var list = document.getElementById('overlayList');
+  var html = '';
+  for (var i = 0; i < overlays.length; i++) {
+    var ov = overlays[i];
+    html += '<div class="overlay-row">'
+      + '<input type="text" value="' + escHtml(ov.text) + '" placeholder="Text\u2026" oninput="onOverlayChange(' + i + ',\'text\',this.value)">'
+      + '<span class="ov-label">from</span>'
+      + '<input type="number" min="0" step="0.1" value="' + ov.start + '" onchange="onOverlayChange(' + i + ',\'start\',this.value)">'
+      + '<span class="ov-label">to</span>'
+      + '<input type="number" min="0" step="0.1" value="' + ov.end + '" onchange="onOverlayChange(' + i + ',\'end\',this.value)">'
+      + '<span class="ov-label">s</span>'
+      + '<button class="btn danger" onclick="removeOverlay(' + i + ')">&times;</button>'
+      + '</div>';
+  }
+  list.innerHTML = html;
+  renderOverlayTotal();
 }
 
 // ── Drag to reorder ──
@@ -1431,7 +1536,7 @@ document.getElementById("timeline").addEventListener("touchend", function(e) {
 // ── Export ──
 async function doExport(forceOverwrite) {
   if (clips.length === 0) { showStatus("Add at least one clip to the timeline", false); return; }
-  if (clips.length === 1 && clips[0].start <= 0 && clips[0].end === -1) {
+  if (clips.length === 1 && clips[0].start <= 0 && clips[0].end === -1 && overlays.length === 0) {
     showStatus("Nothing to render \u2014 single untrimmed clip. Use Rename on the manage page instead.", false);
     return;
   }
@@ -1444,6 +1549,7 @@ async function doExport(forceOverwrite) {
   var outputKey = "video/" + name + ".mp4";
   var payload = {
     clips: clips.map(function(c) { return { key: c.key, start: c.start, end: c.end }; }),
+    overlays: overlays.filter(function(ov) { return ov.text.trim().length > 0; }).map(function(ov) { return { text: ov.text.trim(), start: ov.start, end: ov.end }; }),
     output: outputKey,
     force: !!forceOverwrite
   };

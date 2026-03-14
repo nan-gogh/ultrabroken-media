@@ -1431,11 +1431,11 @@ function renderOverlays() {
   for (var i = 0; i < overlays.length; i++) {
     var ov = overlays[i];
     html += '<div class="overlay-row">'
-      + '<input type="text" value="' + escHtml(ov.text) + '" placeholder="Text\u2026" oninput="onOverlayChange(' + i + ',\'text\',this.value)">'
+      + '<input type="text" value="' + escHtml(ov.text) + '" placeholder="Text\u2026" oninput="onOverlayChange(' + i + ',\\'text\\',this.value)">'
       + '<span class="ov-label">from</span>'
-      + '<input type="number" min="0" step="0.1" value="' + ov.start + '" onchange="onOverlayChange(' + i + ',\'start\',this.value)">'
+      + '<input type="number" min="0" step="0.1" value="' + ov.start + '" onchange="onOverlayChange(' + i + ',\\'start\\',this.value)">'
       + '<span class="ov-label">to</span>'
-      + '<input type="number" min="0" step="0.1" value="' + ov.end + '" onchange="onOverlayChange(' + i + ',\'end\',this.value)">'
+      + '<input type="number" min="0" step="0.1" value="' + ov.end + '" onchange="onOverlayChange(' + i + ',\\'end\\',this.value)">'
       + '<span class="ov-label">s</span>'
       + '<button class="btn danger" onclick="removeOverlay(' + i + ')">&times;</button>'
       + '</div>';

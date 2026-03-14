@@ -51,7 +51,19 @@ async function handleGet(request, env) {
     return new Response("ultrabroken-media", { status: 200 });
   }
 
-  const object = await env.MEDIA.get(key);
+  // Parse Range header for partial content support (required by Discord, browsers)
+  const rangeHeader = request.headers.get("Range");
+  let rangeOpts = undefined;
+  if (rangeHeader) {
+    const m = rangeHeader.match(/^bytes=(\d+)-(\d*)$/);
+    if (m) {
+      const start = parseInt(m[1], 10);
+      const end = m[2] ? parseInt(m[2], 10) : undefined;
+      rangeOpts = end !== undefined ? { offset: start, length: end - start + 1 } : { offset: start };
+    }
+  }
+
+  const object = await env.MEDIA.get(key, rangeOpts ? { range: rangeOpts } : undefined);
   if (!object) {
     return new Response("Not Found", { status: 404 });
   }
@@ -61,6 +73,7 @@ async function handleGet(request, env) {
   headers.set("Cache-Control", "public, max-age=300, must-revalidate");
   headers.set("ETag", object.httpEtag);
   headers.set("Access-Control-Allow-Origin", "*");
+  headers.set("Accept-Ranges", "bytes");
   object.writeHttpMetadata(headers);
 
   // Return 304 if client's cached version matches
@@ -69,6 +82,19 @@ async function handleGet(request, env) {
     return new Response(null, { status: 304, headers });
   }
 
+  const totalSize = object.size;
+
+  // Range request → 206 Partial Content
+  if (rangeOpts) {
+    const start = rangeOpts.offset;
+    const length = object.range?.length ?? (rangeOpts.length || (totalSize - start));
+    const end = start + length - 1;
+    headers.set("Content-Range", `bytes ${start}-${end}/${totalSize}`);
+    headers.set("Content-Length", String(length));
+    return new Response(object.body, { status: 206, headers });
+  }
+
+  headers.set("Content-Length", String(totalSize));
   return new Response(object.body, { headers });
 }
 

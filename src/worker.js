@@ -1103,16 +1103,16 @@ const EDITOR_HTML = `<!DOCTYPE html>
 </div>
 
 <div class="section">
+  <div class="section-header">Timeline <span id="clipCount" style="margin-left:auto;"></span></div>
+  <div class="timeline" id="timeline"></div>
+</div>
+
+<div class="section">
   <div class="section-header">
     <span>Text Overlays</span>
     <span style="margin-left:auto;display:flex;gap:6px;align-items:center;"><span id="overlayTotal" class="overlay-total"></span><button class="btn" onclick="addOverlay()">+ Add Text</button></span>
   </div>
   <div class="overlay-list" id="overlayList"></div>
-</div>
-
-<div class="section">
-  <div class="section-header">Timeline <span id="clipCount" style="margin-left:auto;"></span></div>
-  <div class="timeline" id="timeline"></div>
 </div>
 
 <div class="section">
@@ -1241,26 +1241,31 @@ function getVideoDuration(url) {
 function renderTimeline() {
   var tl = document.getElementById("timeline");
   var html = "";
+  var offset = 0;
   for (var i = 0; i < clips.length; i++) {
     var c = clips[i];
     var maxVal = c.duration > 0 ? c.duration : 100;
     var endVal = (c.end === -1 || c.end > maxVal) ? maxVal : c.end;
     var startPct = (c.start / maxVal * 100).toFixed(1);
     var widthPct = ((endVal - c.start) / maxVal * 100).toFixed(1);
-    var trimDur = c.duration > 0 ? (endVal - c.start).toFixed(1) + "s" : "";
+    var clipDur = c.duration > 0 ? endVal - c.start : 0;
+    var trimDur = c.duration > 0 ? clipDur.toFixed(1) + "s" : "";
+    var timeInfo = c.duration > 0 ? fmtTime(offset) + ' \u2192 ' + fmtTime(offset + clipDur) + ' \u00b7 ' : '';
+    offset += clipDur;
     var sel = i === selectedIndex ? " selected" : "";
     html += '<div class="clip-card' + sel + '" draggable="true" data-index="' + i + '" '
       + 'onclick="selectClip(' + i + ')" '
       + 'ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)">'
       + '<div class="clip-name" title="' + escHtml(c.key) + '" onclick="event.stopPropagation();previewClip(\\'' + escAttr(c.key) + '\\', ' + c.start + ')">' + escHtml(c.name) + '</div>'
       + '<div class="clip-mini-bar"><div class="clip-mini-fill" style="left:' + startPct + '%;width:' + widthPct + '%;"></div></div>'
-      + '<div class="clip-meta">' + (c.duration > 0 ? fmtTime(c.start) + ' \u2192 ' + fmtTime(endVal) + ' \u00b7 ' : '') + (trimDur || '?') + '</div>'
+      + '<div class="clip-meta">' + timeInfo + (trimDur || '?') + '</div>'
       + '<div class="clip-actions">'
       + '<button class="btn danger" onclick="event.stopPropagation();removeClip(' + i + ')">&times;</button>'
       + '</div></div>';
   }
   tl.innerHTML = html;
   document.getElementById("clipCount").textContent = clips.length > 0 ? clips.length + " clip(s)" : "";
+  renderOverlayTotal();
 }
 
 function selectClip(i) {
@@ -1359,15 +1364,7 @@ function patchEditor(c, maxVal) {
 }
 
 function patchTimelineCard(i, c, maxVal) {
-  var card = document.querySelector('.clip-card[data-index="' + i + '"]');
-  if (!card) return;
-  var endVal = (c.end === -1 || c.end > maxVal) ? maxVal : c.end;
-  var startPct = (c.start / maxVal * 100).toFixed(1);
-  var widthPct = ((endVal - c.start) / maxVal * 100).toFixed(1);
-  var bar = card.querySelector('.clip-mini-fill');
-  if (bar) { bar.style.left = startPct + '%'; bar.style.width = widthPct + '%'; }
-  var meta = card.querySelector('.clip-meta');
-  if (meta) meta.textContent = c.duration > 0 ? fmtTime(c.start) + ' \u2192 ' + fmtTime(endVal) + ' \u00b7 ' + (endVal - c.start).toFixed(1) + 's' : '?';
+  renderTimeline();
 }
 
 function removeClip(i) {

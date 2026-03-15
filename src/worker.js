@@ -1437,12 +1437,10 @@ function onOverlayChange(i, field, val) {
     ov.text = val;
   } else {
     var v = parseFloat(val);
-    if (isNaN(v) || v < 0) return;
+    if (isNaN(v) || v < 0) v = 0;
     if (field === 'start') {
-      if (v >= ov.end) v = Math.max(0, ov.end - 0.1);
       ov.start = Math.round(v * 10) / 10;
     } else {
-      if (v <= ov.start) v = ov.start + 0.1;
       ov.end = Math.round(v * 10) / 10;
     }
   }
@@ -1570,9 +1568,17 @@ async function doExport(forceOverwrite) {
     return;
   }
   var outputKey = "video/" + name + ".mp4";
+  var validOverlays = overlays.filter(function(ov) { return ov.text.trim().length > 0; });
+  for (var oi = 0; oi < validOverlays.length; oi++) {
+    var ov = validOverlays[oi];
+    if (ov.end <= ov.start) {
+      showStatus("Overlay \\\"" + ov.text.trim() + "\\\" has end (" + ov.end + ") \\u2264 start (" + ov.start + ")", false);
+      return;
+    }
+  }
   var payload = {
     clips: clips.map(function(c) { return { key: c.key, start: c.start, end: c.end }; }),
-    overlays: overlays.filter(function(ov) { return ov.text.trim().length > 0; }).map(function(ov) { return { text: ov.text.trim(), start: ov.start, end: ov.end }; }),
+    overlays: validOverlays.map(function(ov) { return { text: ov.text.trim(), start: ov.start, end: ov.end }; }),
     output: outputKey,
     force: !!forceOverwrite
   };

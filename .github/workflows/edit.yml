@@ -75,19 +75,21 @@ jobs:
             # Download from R2
             wrangler r2 object get "ultrabroken-media/$KEY" --file="clip_${i}.${EXT_LOWER}" --remote
 
-            # Build trim arguments
-            TRIM_ARGS=""
+            # Build trim arguments (input -ss resets timestamps to 0)
+            SS_ARGS=""
+            T_ARGS=""
 
             if [ "$(echo "$START > 0" | bc -l)" -eq 1 ]; then
-              TRIM_ARGS="-ss $START"
+              SS_ARGS="-ss $START"
             fi
 
             if [ "$END" != "-1" ]; then
-              TRIM_ARGS="$TRIM_ARGS -to $END"
+              DURATION=$(echo "$END - $START" | bc -l)
+              T_ARGS="-t $DURATION"
             fi
 
-            # Re-encode trim to intermediate (frame-accurate cuts, avoids frozen frames)
-            ffmpeg -i "clip_${i}.${EXT_LOWER}" $TRIM_ARGS \
+            # Re-encode trim to intermediate (input -ss ensures PTS starts at 0)
+            ffmpeg $SS_ARGS -i "clip_${i}.${EXT_LOWER}" $T_ARGS \
               -c:v libx264 -preset ultrafast -crf 0 \
               -c:a pcm_s16le \
               -y "trimmed_${i}.mkv"
@@ -100,8 +102,8 @@ jobs:
           echo ""
           echo "=== Concatenating + Transcoding to H.264+AAC ==="
 
-          # Build video filter chain
-          VF="scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease"
+          # Build video filter chain (setpts normalises timestamps so drawtext enable expressions are correct)
+          VF="setpts=PTS-STARTPTS,scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease"
 
           # Add text overlays if present
           OVERLAY_COUNT=$(echo "$EDIT_JSON" | jq '.overlays | length // 0')
@@ -116,9 +118,12 @@ jobs:
             done
           fi
 
+          echo "VF=$VF"
+
           ffmpeg -f concat -safe 0 -i concat_list.txt \
             -c:v libx264 -crf 30 -preset slow \
             -vf "$VF" \
+            -af asetpts=PTS-STARTPTS \
             -r 24 \
             -c:a aac -b:a 64k \
             -movflags +faststart \

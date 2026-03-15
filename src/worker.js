@@ -70,7 +70,7 @@ async function handleGet(request, env) {
 
   const headers = new Headers();
   headers.set("Content-Type", getMime(key));
-  headers.set("Cache-Control", "public, max-age=300, must-revalidate");
+  headers.set("Cache-Control", "public, no-cache");
   headers.set("ETag", object.httpEtag);
   headers.set("Access-Control-Allow-Origin", "*");
   headers.set("Accept-Ranges", "bytes");

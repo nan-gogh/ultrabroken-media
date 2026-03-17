@@ -98,10 +98,21 @@ export class LocalBackend {
     const classWorkerURL = new URL(CLASS_WORKER_PATH, location.href).href;
 
     if (crossOriginIsolated) {
-      const coreURL   = await toBlobURL(`${CORE_MT_BASE}/ffmpeg-core.js`,        'text/javascript');
+      // Fetch core JS as text and patch the compile-time PTHREAD_POOL_SIZE.
+      // @ffmpeg/core-mt was compiled with PTHREAD_POOL_SIZE=0 (on-demand only).
+      // On-demand pthread creation requires the event loop, but exec() blocks it
+      // — deadlocking any codec that calls pthread_create().  Patching the JS to
+      // pre-allocate a pool before exec() runs eliminates the deadlock.
+      const poolSize = (navigator.hardwareConcurrency ?? 4) + 4;
+      const coreText = await fetch(`${CORE_MT_BASE}/ffmpeg-core.js`).then(r => r.text());
+      const patched  = coreText.replace(
+        /PTHREAD_POOL_SIZE\s*=\s*\d+/,
+        `PTHREAD_POOL_SIZE=${poolSize}`,
+      );
+      const coreURL   = URL.createObjectURL(new Blob([patched], { type: 'text/javascript' }));
       const wasmURL   = await toBlobURL(`${CORE_MT_BASE}/ffmpeg-core.wasm`,      'application/wasm');
       const workerURL = await toBlobURL(`${CORE_MT_BASE}/ffmpeg-core.worker.js`, 'text/javascript');
-      this.onLog?.('Loading multi-threaded core…');
+      this.onLog?.(`Loading multi-threaded core (pool = ${poolSize})…`);
       await this.ffmpeg.load({ classWorkerURL, coreURL, wasmURL, workerURL });
     } else {
       const coreURL = await toBlobURL(`${CORE_BASE}/ffmpeg-core.js`,   'text/javascript');

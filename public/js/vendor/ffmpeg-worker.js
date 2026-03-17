@@ -31,10 +31,6 @@ const load = async ({ coreURL: _coreURL, wasmURL: _wasmURL, workerURL: _workerUR
         // Fix `Overload resolution failed.` when using multi-threaded ffmpeg-core.
         // Encoded wasmURL and workerURL in the URL as a hack to fix locateFile issue.
         mainScriptUrlOrBlob: `${coreURL}#${btoa(JSON.stringify({ wasmURL, workerURL }))}`,
-        // Pre-allocate a pthread worker pool before exec() runs. Without this, any
-        // pthread_create() inside the synchronous exec() call must spawn workers
-        // dynamically through the blocked message loop — causing a deadlock at 0%.
-        PTHREAD_POOL_SIZE: (self.navigator?.hardwareConcurrency ?? 8) + 4,
     });
     ffmpeg.setLogger((data) => self.postMessage({ type: FFMessageType.LOG, data }));
     ffmpeg.setProgress((data) => self.postMessage({

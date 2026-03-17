@@ -43,6 +43,7 @@ export function initEditor(b) {
     loadLibrary();
   } else {
     wireLocalPicker();
+    renderLocalLibrary();
   }
   renderTimeline();
   renderOverlays();
@@ -56,11 +57,11 @@ function applyModeUI() {
   label.textContent = isRemote ? 'remote' : 'local';
   label.classList.toggle('remote', isRemote);
 
-  // Source sections — local mode shows dropzone + library; remote shows library only
-  document.getElementById('localPickerSection').hidden = isRemote;
+  // Library section — always visible; dropzone only in local mode
   document.getElementById('librarySection').hidden = false;
   document.getElementById('libraryRefresh').hidden = !isRemote;
   document.getElementById('libraryTitle').textContent = isRemote ? 'Video Library' : 'Footage';
+  document.getElementById('dropzone').hidden = isRemote;
 
   // Export button label
   document.getElementById('exportBtn').textContent = isRemote
@@ -121,8 +122,6 @@ function addLocalFiles(fileList) {
   }
   if (!files.length) return;
 
-  // TODO: re-enable compression once export itself is verified working.
-  // For now, add raw files directly so we can debug the export pipeline.
   for (const file of files) {
     localLibrary.push({
       key: file.name,
@@ -135,50 +134,23 @@ function addLocalFiles(fileList) {
   renderLocalLibrary();
 }
 
-async function importFiles(files) {
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    const label = files.length > 1
-      ? `Compressing ${i + 1}/${files.length}: ${file.name}`
-      : `Compressing ${file.name}`;
-    showStatus(label + '\u2026', true, 0);
-    setProgress(true, 0);
-
-    try {
-      const { blob, duration } = await backend.importFile(file, ratio => {
-        setProgress(true, ratio);
-      });
-      localLibrary.push({
-        key: file.name,
-        name: file.name,
-        size: blob.size,
-        duration,
-        _file: blob,     // compressed blob replaces the raw File
-      });
-      renderLocalLibrary();
-    } catch (e) {
-      showStatus('Compression failed: ' + file.name + ' \u2014 ' + e.message, false);
-    }
-  }
-  setProgress(false);
-  showStatus(files.length === 1
-    ? 'Ready: ' + files[0].name
-    : files.length + ' files compressed and ready', true);
-}
-
 function renderLocalLibrary() {
   const container = document.getElementById('libraryList');
   if (!localLibrary.length) {
-    container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-dim);font-size:0.82rem;">Drop files above to add footage</div>';
+    container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-dim);font-size:0.82rem;">Drop files below to add footage</div>';
     return;
   }
   let html = '';
   for (const f of localLibrary) {
     const name = escHtml(f.name);
     const size = formatSize(f.size);
+    const compressBtn = f.compressed
+      ? `<button class="btn compress-btn done" disabled>\u2714</button>`
+      : `<button class="btn compress-btn" onclick="compressLibraryFile(${attrJson(f.key)})" title="Compress to H.264 720p">\u2699</button>`;
     html += `<div class="library-row">`
       + `<span class="name" onclick="previewLocalFile(${attrJson(f.key)})" title="Click to preview">${name}</span>`
       + `<span class="size">${size}</span>`
+      + compressBtn
       + `<button class="btn" onclick="addLocalClip(${attrJson(f.key)})">+</button>`
       + `</div>`;
   }
@@ -196,6 +168,28 @@ window.addLocalClip = function(key) {
   const f = localLibrary.find(x => x.key === key);
   if (!f) return;
   addClip({ key: f.key, name: f.name, _file: f._file, _local: true, duration: f.duration || 0 });
+};
+
+window.compressLibraryFile = async function(key) {
+  const f = localLibrary.find(x => x.key === key);
+  if (!f || f.compressed) return;
+  showStatus('Compressing ' + f.name + '\u2026', true, 0);
+  setProgress(true, 0);
+  try {
+    const { blob, duration } = await backend.importFile(f._file, ratio => {
+      setProgress(true, ratio);
+    });
+    f._file = blob;
+    f.size = blob.size;
+    f.duration = duration;
+    f.compressed = true;
+    renderLocalLibrary();
+    setProgress(true, 1, true);
+    showStatus('Compressed: ' + f.name + ' \u2192 ' + formatSize(blob.size), true);
+  } catch (e) {
+    showStatus('Compression failed: ' + e.message, false);
+    setProgress(false);
+  }
 };
 
 // ── Remote library ─────────────────────────────────────────────────────────
@@ -247,7 +241,7 @@ function previewUrl(url, key, startTime) {
   v.preload = 'metadata';
   v.src = url + '#t=' + t;
   box.replaceChildren(v);
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 // ── Clip management ────────────────────────────────────────────────────────
@@ -636,8 +630,9 @@ async function runLocalExport(job, name) {
     if (step) showStatus(step, true, 0);
   });
 
-  setProgress(false);
-  if (!result) return; // cancelled
+  if (!result) { setProgress(false); return; } // cancelled
+
+  setProgress(true, 1, true); // keep visible at 100%, hide cancel
 
   // Trigger browser download
   const url = URL.createObjectURL(result);
@@ -668,15 +663,17 @@ export function cancelExport() {
   cancelRequested = true;
 }
 
-function setProgress(visible, ratio) {
+function setProgress(visible, ratio, finished) {
   const wrap = document.getElementById('progressWrap');
   const bar = document.getElementById('progressBar');
   const label = document.getElementById('progressLabel');
+  const cancel = document.getElementById('cancelBtn');
   wrap.hidden = !visible;
   if (visible) {
     const pct = Math.round((ratio || 0) * 100);
     bar.style.width = pct + '%';
     label.textContent = pct + '%';
+    cancel.hidden = !!finished;
   }
 }
 

@@ -36,24 +36,16 @@ if (!location.pathname.startsWith('/manage/editor')) {
   </div>
 </div>
 
-<div class="section" id="localPickerSection">
+<div class="section" id="librarySection">
   <div class="section-header">
-    <span>Add Footage</span>
+    <span id="libraryTitle">Footage</span>
+    <button class="btn" id="libraryRefresh" onclick="loadLibrary()" title="Refresh" hidden>↺</button>
   </div>
-  <div class="upload-zone" id="dropzone">
+  <div class="library-list" id="libraryList"></div>
+  <div class="upload-zone" id="dropzone" hidden>
     <p><strong>Drop video files here</strong> or click to browse</p>
     <p style="margin-top:6px;font-size:0.78rem;color:var(--text-dim);">Files stay on your device — no upload</p>
     <input type="file" id="localFileInput" accept="video/*" multiple hidden>
-  </div>
-</div>
-
-<div class="section" id="librarySection">
-  <div class="section-header">
-    <span id="libraryTitle">Video Library</span>
-    <button class="btn" id="libraryRefresh" onclick="loadLibrary()" title="Refresh">↺</button>
-  </div>
-  <div class="library-list" id="libraryList">
-    <div style="padding:20px;text-align:center;color:var(--text-dim);font-size:0.82rem;">Drop files above to add footage</div>
   </div>
 </div>
 
@@ -91,7 +83,7 @@ if (!location.pathname.startsWith('/manage/editor')) {
   </div>
   <!-- Progress bar (local mode only) -->
   <div class="progress-bar-wrap" id="progressWrap" hidden>
-    <div class="progress-bar" id="progressBar"></div>
+    <div class="progress-track"><div class="progress-bar" id="progressBar"></div></div>
     <span class="progress-label" id="progressLabel">0%</span>
     <button class="btn danger" id="cancelBtn" onclick="cancelExport()">Cancel</button>
   </div>

@@ -490,7 +490,8 @@ export default {
       const ghRepo = env.GITHUB_REPO || 'nan-gogh/ultrabroken-media';
       const [ghOwner, ghRepoName] = ghRepo.split('/');
       const editorOrigin = (env.EDITOR_ORIGIN || `https://${ghOwner}.github.io/${ghRepoName}`).replace(/\/$/, '');
-      // Extract Worker origin from request URL and pass it as a param so the editor knows where to send API requests
+      // Extract Worker origin from request URL and pass it as a param so the
+      // editor knows where to send API requests (required for cross-origin auth).
       const workerOrigin = new URL(request.url).origin;
       return Response.redirect(`${editorOrigin}/?mode=remote&origin=${encodeURIComponent(workerOrigin)}`, 302);
     }

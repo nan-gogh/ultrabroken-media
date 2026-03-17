@@ -873,8 +873,12 @@ function previewFile(key) {
 async function renameFile(key) {
   var prefix = key.substring(0, key.indexOf('/') + 1);
   var oldName = key.slice(prefix.length);
-  var newName = prompt('Rename file:\\n' + oldName, oldName);
-  if (!newName || newName === oldName) return;
+  var dotIdx = oldName.lastIndexOf('.');
+  var stem = dotIdx > 0 ? oldName.substring(0, dotIdx) : oldName;
+  var ext  = dotIdx > 0 ? oldName.substring(dotIdx) : '';
+  var newStem = prompt('Rename file:\\n' + oldName + '\\n\\nExtension (' + ext + ') will be preserved.', stem);
+  if (newStem === null || newStem.trim() === '' || newStem === stem) return;
+  var newName = newStem.trim() + ext;
   try {
     showStatus('Renaming...', true);
     var res = await fetch(API + '/rename', {

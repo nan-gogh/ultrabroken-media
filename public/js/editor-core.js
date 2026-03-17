@@ -171,6 +171,8 @@ function renderLocalLibrary() {
     container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-dim);font-size:0.82rem;">Drop files below to add footage</div>';
     return;
   }
+  const compressControl = document.getElementById('localCompressControl');
+  if (compressControl) compressControl.hidden = !localLibrary.some(f => !f.compressed);
   let html = '';
   for (const f of localLibrary) {
     const name = escHtml(f.name);
@@ -179,17 +181,13 @@ function renderLocalLibrary() {
     const compressBtn = f.compressed
       ? `<button class="btn compress-btn done" onclick="uncompressLibraryFile(${ak})" title="Undo compression — restore original (${formatSize(f._sizeOriginal || f.size)})">&circlearrowleft;</button>`
       : `<button class="btn compress-btn" onclick="compressLibraryFile(${ak})" title="Compress to H.264 720p">⚙</button>`;
-    const slider = f.compressed ? '' : `<span class="compress-label">Compression</span><input type="range" class="quality-slider" min="18" max="30" value="24" data-key="${escHtml(f.key)}" title="CRF 18 (high quality) – 30 (small file)">`;
     html += `<div class="library-row">`
-      + `<div class="lib-main">`
       + `<span class="name" onclick="previewLocalFile(${ak})" title="Click to preview">${name}</span>`
-      + `<span class="lib-compress">`
+      + `<span class="lib-controls">`
       + `<span class="size">${size}</span>`
-      + slider
       + compressBtn
+      + `<button class="btn" onclick="addLocalClip(${ak})">+</button>`
       + `</span>`
-      + `</div>`
-      + `<button class="btn lib-add" onclick="addLocalClip(${ak})">+</button>`
       + `</div>`;
   }
   container.innerHTML = html;
@@ -211,7 +209,7 @@ window.addLocalClip = function(key) {
 window.compressLibraryFile = async function(key) {
   const f = localLibrary.find(x => x.key === key);
   if (!f || f.compressed) return;
-  const sliderEl = document.querySelector('.quality-slider[data-key="' + CSS.escape(key) + '"]');
+  const sliderEl = document.getElementById('localQualitySlider');
   const crf = sliderEl ? parseInt(sliderEl.value, 10) : 24;
   clearLog();
   appendLog('Compressing ' + f.name + '…');

@@ -54,7 +54,13 @@ if (!location.pathname.startsWith('/manage/editor')) {
 <div class="section" id="librarySection">
   <div class="section-header">
     <span id="libraryTitle">Footage</span>
-    <button class="btn" id="libraryRefresh" onclick="loadLibrary()" title="Refresh" hidden>↺</button>
+    <span class="header-right">
+      <span class="compress-control" id="localCompressControl" hidden>
+        <span class="compress-label">Compression</span>
+        <input type="range" class="quality-slider" id="localQualitySlider" min="18" max="30" value="24" title="CRF 18 (high quality) – 30 (small file)">
+      </span>
+      <button class="btn" id="libraryRefresh" onclick="loadLibrary()" title="Refresh" hidden>↺</button>
+    </span>
   </div>
   <div class="library-list" id="libraryList"></div>
   <div class="upload-zone" id="dropzone" hidden>

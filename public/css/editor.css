@@ -323,7 +323,7 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 #processingStep.err { color: var(--danger); opacity: 1 !important; }
 #processingSection .section-header { flex-wrap: wrap; }
 #processingStep {
-  flex: 1 1 auto; min-width: 0; overflow-wrap: break-word;
+  flex: 1 1 100%; min-width: 0; overflow-wrap: break-word;
 }
 
 /* ── Settings panel ── */

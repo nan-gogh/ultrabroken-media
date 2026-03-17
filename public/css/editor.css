@@ -97,6 +97,9 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 .compress-control {
   display: flex; align-items: center; gap: 6px;
 }
+.compress-control[hidden] {
+  display: none;
+}
 .compress-label {
   color: var(--text-dim); font-size: 0.68rem; white-space: nowrap;
 }

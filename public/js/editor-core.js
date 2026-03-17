@@ -132,9 +132,9 @@ function renderLocalLibrary() {
     const name = escHtml(f.name);
     const size = formatSize(f.size);
     html += `<div class="library-row">`
-      + `<span class="name" onclick="previewLocalFile(${JSON.stringify(f.key)})" title="Click to preview">${name}</span>`
+      + `<span class="name" onclick="previewLocalFile(${attrJson(f.key)})" title="Click to preview">${name}</span>`
       + `<span class="size">${size}</span>`
-      + `<button class="btn" onclick="addLocalClip(${JSON.stringify(f.key)})">+</button>`
+      + `<button class="btn" onclick="addLocalClip(${attrJson(f.key)})">+</button>`
       + `</div>`;
   }
   container.innerHTML = html;
@@ -171,9 +171,9 @@ export async function loadLibrary() {
       const badge = f.transcode === 'pending'
         ? ' <span style="color:#ffaa32;font-size:0.68rem;">⏳</span>' : '';
       html += `<div class="library-row">`
-        + `<span class="name" onclick="previewByKey(${JSON.stringify(f.key)})" title="Click to preview">${escHtml(name)}</span>${badge}`
+        + `<span class="name" onclick="previewByKey(${attrJson(f.key)})" title="Click to preview">${escHtml(name)}</span>${badge}`
         + `<span class="size">${size}</span>`
-        + `<button class="btn" onclick="addRemoteClip(${JSON.stringify(f.key)})">+</button>`
+        + `<button class="btn" onclick="addRemoteClip(${attrJson(f.key)})">+</button>`
         + `</div>`;
     }
     container.innerHTML = html;
@@ -259,12 +259,12 @@ export function renderTimeline() {
     const timeInfo = c.duration > 0 ? fmtTime(offset) + ' → ' + fmtTime(offset + clipDur) + ' · ' : '';
     offset += clipDur;
     const sel = i === selectedIndex ? ' selected' : '';
-    const keyJson = JSON.stringify(c.key);
+    const keyAttr = attrJson(c.key);
     html += `<div class="clip-card${sel}" draggable="true" data-index="${i}"
         onclick="selectClip(${i})"
         ondragstart="onDragStart(event)" ondragover="onDragOver(event)"
         ondrop="onDrop(event)" ondragend="onDragEnd(event)">`
-      + `<div class="clip-name" title="${escHtml(c.key)}" onclick="event.stopPropagation();previewClipAt(${keyJson},${c.start})">${escHtml(c.name)}</div>`
+      + `<div class="clip-name" title="${escHtml(c.key)}" onclick="event.stopPropagation();previewClipAt(${keyAttr},${c.start})">${escHtml(c.name)}</div>`
       + `<div class="clip-mini-bar"><div class="clip-mini-fill" style="left:${startPct}%;width:${widthPct}%;"></div></div>`
       + `<div class="clip-meta">${timeInfo}${trimDur || '?'}</div>`
       + `<div class="clip-actions"><button class="btn danger" onclick="event.stopPropagation();removeClip(${i})">&times;</button></div>`
@@ -645,6 +645,14 @@ function escHtml(s) {
   const d = document.createElement('div');
   d.textContent = s;
   return d.innerHTML;
+}
+
+// JSON-encode a value for safe embedding inside an HTML attribute delimited by
+// double quotes.  JSON.stringify produces double-quoted strings; those inner
+// quotes must be escaped as &quot; so the HTML parser doesn't end the attribute
+// early, which would truncate the JS expression and cause a SyntaxError.
+function attrJson(v) {
+  return JSON.stringify(v).replace(/"/g, '&quot;');
 }
 
 // Expose to global scope for inline onclick handlers that reference these

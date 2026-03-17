@@ -509,7 +509,12 @@ export default {
     // Editor proxy — serve the GitHub Pages editor from the Worker domain so
     // the CF Access cookie covers the page and all its API calls.  CF Access
     // gates /manage/* at the edge; no extra auth needed in the browser.
-    if (path.startsWith("/manage/editor")) {
+    // Redirect /manage/editor → /manage/editor/ so relative asset paths
+    // (css/editor.css, js/app.js) resolve under the proxy prefix.
+    if (path === "/manage/editor") {
+      return Response.redirect(url.origin + "/manage/editor/", 301);
+    }
+    if (path.startsWith("/manage/editor/")) {
       return handleEditorProxy(request, env, path);
     }
 

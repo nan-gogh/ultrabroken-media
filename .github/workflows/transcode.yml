@@ -67,9 +67,21 @@ jobs:
             original_size=$(stat -c%s "input.$ext_lower")
             echo "Original: $(numfmt --to=iec $original_size)"
 
-            # Transcode: H.264+AAC, max 720p24, CRF 30
+            # Probe duration and compute original bitrate for maxrate cap
+            dur=$(ffmpeg -i "input.$ext_lower" 2>&1 | grep -oP 'Duration: \K[0-9:.]+' | head -1)
+            if [ -n "$dur" ]; then
+              IFS=':' read -r hh mm ss <<< "$dur"
+              total_secs=$(echo "$hh * 3600 + $mm * 60 + $ss" | bc)
+              orig_kbps=$(echo "$original_size * 8 / $total_secs / 1000" | bc)
+              echo "Original bitrate: ${orig_kbps} kbps"
+              maxrate_args="-maxrate ${orig_kbps}k -bufsize $((orig_kbps * 2))k"
+            else
+              maxrate_args=""
+            fi
+
+            # Transcode: H.264+AAC, max 720p24, CRF 30, capped at original bitrate
             ffmpeg -i "input.$ext_lower" \
-              -c:v libx264 -crf 30 -preset slow \
+              -c:v libx264 -crf 30 -preset slow $maxrate_args \
               -vf "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease" \
               -r 24 \
               -c:a aac -b:a 64k \
@@ -77,18 +89,23 @@ jobs:
               -y "output.mp4"
 
             new_size=$(stat -c%s "output.mp4")
-            savings=$(( (original_size - new_size) * 100 / original_size ))
-            echo "Transcoded: $(numfmt --to=iec $new_size) (-${savings}%)"
 
-            # Upload transcoded file
-            wrangler r2 object put "ultrabroken-media/$out_key" \
-              --file="output.mp4" --content-type="video/mp4" --remote
-            echo "Uploaded: $out_key"
+            if [ "$new_size" -ge "$original_size" ]; then
+              echo "Skipped: transcoded file is not smaller ($(numfmt --to=iec $new_size) >= $(numfmt --to=iec $original_size)), keeping original"
+            else
+              savings=$(( (original_size - new_size) * 100 / original_size ))
+              echo "Transcoded: $(numfmt --to=iec $new_size) (-${savings}%)"
 
-            # Delete the original if the key changed
-            if [ "$key" != "$out_key" ]; then
-              wrangler r2 object delete "ultrabroken-media/$key" --remote
-              echo "Deleted original: $key"
+              # Upload transcoded file
+              wrangler r2 object put "ultrabroken-media/$out_key" \
+                --file="output.mp4" --content-type="video/mp4" --remote
+              echo "Uploaded: $out_key"
+
+              # Delete the original if the key changed
+              if [ "$key" != "$out_key" ]; then
+                wrangler r2 object delete "ultrabroken-media/$key" --remote
+                echo "Deleted original: $key"
+              fi
             fi
 
             # Cleanup temp files

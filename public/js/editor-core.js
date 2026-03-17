@@ -153,13 +153,14 @@ function addLocalFiles(fileList) {
   if (!files.length) return;
 
   for (const file of files) {
-    localLibrary.push({
-      key: file.name,
-      name: file.name,
-      size: file.size,
-      duration: 0,
-      _file: file,
-    });
+    const entry = { key: file.name, name: file.name, size: file.size, duration: 0, _file: file };
+    localLibrary.push(entry);
+    const url = URL.createObjectURL(file);
+    const v = document.createElement('video');
+    v.preload = 'metadata';
+    v.onloadedmetadata = () => { URL.revokeObjectURL(url); entry.duration = v.duration || 0; };
+    v.onerror = () => URL.revokeObjectURL(url);
+    v.src = url;
   }
   renderLocalLibrary();
 }
@@ -175,7 +176,7 @@ function renderLocalLibrary() {
     const name = escHtml(f.name);
     const size = formatSize(f.size);
     const compressBtn = f.compressed
-      ? `<button class="btn compress-btn done" disabled>\u2714</button>`
+      ? `<button class="btn compress-btn done" onclick="uncompressLibraryFile(${attrJson(f.key)})" title="Undo compression \u2014 restore original (${formatSize(f._sizeOriginal || f.size)})">&circlearrowleft;</button>`
       : `<button class="btn compress-btn" onclick="compressLibraryFile(${attrJson(f.key)})" title="Compress to H.264 720p">\u2699</button>`;
     html += `<div class="library-row">`
       + `<span class="name" onclick="previewLocalFile(${attrJson(f.key)})" title="Click to preview">${name}</span>`
@@ -205,25 +206,67 @@ window.addLocalClip = function(key) {
 window.compressLibraryFile = async function(key) {
   const f = localLibrary.find(x => x.key === key);
   if (!f || f.compressed) return;
+  // Pre-flight: probe duration if unknown, then check bitrate
+  if (!f.duration) {
+    f.duration = await new Promise(resolve => {
+      const v = document.createElement('video');
+      v.preload = 'metadata';
+      const url = URL.createObjectURL(f._file);
+      v.onloadedmetadata = () => { URL.revokeObjectURL(url); resolve(v.duration || 0); };
+      v.onerror = () => { URL.revokeObjectURL(url); resolve(0); };
+      v.src = url;
+    });
+  }
+  if (f.duration > 0) {
+    const kbps = (f.size * 8 / f.duration) / 1000;
+    if (kbps <= 1500) {
+      showStatus(f.name + ' \u2014 already well compressed (' + Math.round(kbps) + ' kbps)', true);
+      return;
+    }
+  }
   clearLog();
   appendLog('Compressing ' + f.name + '…');
   setProgress(true, 0);
   document.getElementById('processingStep').textContent = 'Compressing ' + f.name + '\u2026';
   try {
+    const originalSize = f.size;
+    const kbps = f.duration > 0 ? (f.size * 8 / f.duration) / 1000 : 0;
     const { blob, duration } = await backend.importFile(f._file, ratio => {
       setProgress(true, ratio);
-    });
+    }, kbps);
+    if (blob.size >= originalSize) {
+      setProgress(true, 1, true);
+      showStatus(f.name + ' \u2014 already optimized, kept original (' + formatSize(originalSize) + ')', true);
+      return;
+    }
+    f._fileOriginal = f._file;
+    f._sizeOriginal = originalSize;
+    f._durationOriginal = f.duration;
     f._file = blob;
     f.size = blob.size;
     f.duration = duration;
     f.compressed = true;
     renderLocalLibrary();
     setProgress(true, 1, true);
-    showStatus('Compressed: ' + f.name + ' \u2192 ' + formatSize(blob.size), true);
+    showStatus('Compressed: ' + f.name + ' ' + formatSize(originalSize) + ' \u2192 ' + formatSize(blob.size), true);
   } catch (e) {
     showStatus('Compression failed: ' + e.message, false);
     setProgress(false);
   }
+};
+
+window.uncompressLibraryFile = function(key) {
+  const f = localLibrary.find(x => x.key === key);
+  if (!f || !f.compressed || !f._fileOriginal) return;
+  f._file = f._fileOriginal;
+  f.size = f._sizeOriginal;
+  f.duration = f._durationOriginal;
+  f.compressed = false;
+  delete f._fileOriginal;
+  delete f._sizeOriginal;
+  delete f._durationOriginal;
+  renderLocalLibrary();
+  showStatus('Restored original: ' + f.name + ' (' + formatSize(f.size) + ')', true);
 };
 
 // ── Remote library ─────────────────────────────────────────────────────────

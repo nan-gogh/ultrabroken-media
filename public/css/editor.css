@@ -115,7 +115,7 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 }
 .library-row .compress-btn:hover { opacity: 1; }
 .library-row .compress-btn.done {
-  opacity: 0.5; pointer-events: none; color: var(--text-dim);
+  opacity: 0.5; color: var(--text-dim);
 }
 
 /* ── Timeline ── */

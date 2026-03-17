@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ultrabroken Archives — Video Editor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=New+Rocker&family=Texturina:ital,opsz,wght@0,12..44,100..900;1,12..44,100..900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/editor.css">
+<!-- COI service worker: only needed in local mode for FFmpeg.wasm SharedArrayBuffer.
+     Remote mode runs entirely server-side, so skip the SW (avoids a first-visit reload).
+     Register with a literal path — dynamic script injection makes document.currentScript
+     null on desktop browsers, causing the fallback path lookup to fail silently. -->
+<script>
+if (!location.pathname.startsWith('/manage/editor')) {
+  if ('serviceWorker' in navigator && !crossOriginIsolated) {
+    navigator.serviceWorker.register('../coi-serviceworker.js').then(function(reg) {
+      // Case 1: SW just installed for the first time → reload once it activates.
+      if (reg.installing) {
+        reg.installing.addEventListener('statechange', function() {
+          if (this.state === 'activated') location.reload();
+        });
+      // Case 2: SW was already installed/active but this page loaded before it
+      //          could intercept (e.g. first visit after a hard-refresh, or the SW
+      //          was registered but the current document wasn't fetched through it).
+      //          crossOriginIsolated is still false, so we need one more reload.
+      } else if (reg.active) {
+        location.reload();
+      }
+    }).catch(function(err) {
+      console.warn('[coi-sw] Registration failed (single-threaded fallback):', err);
+    });
+  }
+}
+</script>
+</head>
+<body>
+
+<header>
+  <h1>Ultrabroken Archives <span class="sub">Video Editor</span></h1>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <span id="modeLabel" class="mode-label">local</span>
+  </div>
+</header>
+
+<div class="section">
+  <div class="section-header">Preview</div>
+  <div class="preview" id="previewBox">
+    <div class="placeholder">Select a clip to preview</div>
+  </div>
+</div>
+
+<div class="section" id="librarySection">
+  <div class="section-header">
+    <span id="libraryTitle">Footage</span>
+    <span class="header-right">
+      <span class="compress-control" id="localCompressControl" hidden>
+        <span class="compress-label">Compression</span>
+        <input type="range" class="quality-slider" id="localQualitySlider" min="18" max="30" value="24" title="CRF 18 (high quality) – 30 (small file)">
+      </span>
+      <button class="btn" id="libraryRefresh" onclick="loadLibrary()" title="Refresh" hidden>↺</button>
+    </span>
+  </div>
+  <div class="library-list" id="libraryList"></div>
+  <div class="upload-zone" id="dropzone" hidden>
+    <p><strong>Drop video files here</strong> or click to browse</p>
+    <p style="margin-top:6px;font-size:0.78rem;color:var(--text-dim);">Files stay on your device — no upload</p>
+    <input type="file" id="localFileInput" accept="video/*" multiple hidden>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header">Clip Editor</div>
+  <div class="clip-editor" id="clipEditor">
+    <div class="empty-msg">Select a clip from the timeline to edit its range</div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header">Timeline <span id="clipCount" style="margin-left:auto;"></span><span id="timelineTotal" class="overlay-total" style="margin-left:8px;"></span></div>
+  <div class="timeline" id="timeline"></div>
+</div>
+
+<div class="section">
+  <div class="section-header">
+    <span>Text Overlays</span>
+    <span style="margin-left:auto;display:flex;gap:6px;align-items:center;">
+      <span id="overlayTotal" class="overlay-total"></span>
+      <button class="btn" onclick="addOverlay()">+ Add Text</button>
+    </span>
+  </div>
+  <div class="overlay-list" id="overlayList"></div>
+</div>
+
+<div class="section">
+  <div class="section-header">Export</div>
+  <div class="export-bar" id="exportBar">
+    <label>Output:</label>
+    <span class="suffix" id="exportPrefix">video/</span>
+    <input type="text" id="outputName" placeholder="my-edit" spellcheck="false">
+    <span class="suffix">.mp4</span>
+    <button class="btn primary" id="exportBtn" onclick="doExport()">Process → Download</button>
+  </div>
+</div>
+
+<!-- Processing panel: always visible, idle when no work is running -->
+<div class="section" id="processingSection">
+  <div class="section-header">
+    <span id="processingStep">Processing…</span>
+  </div>
+  <div class="progress-track-wrap">
+    <div class="progress-track">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <span class="progress-label" id="progressLabel">0%</span>
+    <button class="btn danger btn-sm" id="cancelBtn" onclick="cancelExport()">Cancel</button>
+  </div>
+  <div id="processingLog" class="processing-log"></div>
+</div>
+
+<script type="module" src="../js/app.js"></script>
+</body>
+</html>

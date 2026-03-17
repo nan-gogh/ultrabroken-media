@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Ultrabroken Media Worker
  *
  * Serves media files from R2 (public) and provides a management UI
@@ -7,12 +7,13 @@
  * Routes:
  *   GET  /manage            → Management UI (upload, browse, delete)
  *   GET  /manage/editor/*   → Proxied editor (GitHub Pages → same origin)
- *   GET  /manage/api/list   → JSON listing of files in a prefix
+ *   GET  /manage/api/list   → JSON listing of files in a prefix (authed)
  *   POST /manage/api/upload → Upload file(s) to R2
  *   POST /manage/api/delete → Delete a file from R2
  *   POST /manage/api/edit   → Dispatch edit job to GitHub Actions
  *   POST /manage/api/rename → Rename a file in R2
  *   POST /manage/api/purge  → Delete all files under a prefix
+ *   GET  /api/list          → Public read-only file listing (no auth)
  *   GET  /*                 → Serve file from R2 (public)
  */
 
@@ -100,6 +101,38 @@ async function handleGet(request, env) {
 
   headers.set("Content-Length", String(totalSize));
   return new Response(object.body, { headers });
+}
+
+// -- Public read-only list --------------------------------------------------
+
+async function handlePublicList(request, env) {
+  const url = new URL(request.url);
+  const prefix = url.searchParams.get("prefix") || "";
+  const cursor = url.searchParams.get("cursor") || undefined;
+
+  const listed = await env.MEDIA.list({
+    prefix: prefix || undefined,
+    limit: 1000,
+    cursor,
+  });
+
+  const files = listed.objects.map((obj) => ({
+    key: obj.key,
+    size: obj.size,
+    uploaded: obj.uploaded,
+  }));
+
+  return new Response(JSON.stringify({
+    files,
+    truncated: listed.truncated,
+    cursor: listed.truncated ? listed.cursor : null,
+  }), {
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+      'Cache-Control': 'public, no-cache',
+    },
+  });
 }
 
 // â”€â”€ Management API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -456,9 +489,10 @@ async function handleEditorProxy(request, env, path) {
   const [ghOwner, ghRepoName] = ghRepo.split('/');
   const pagesOrigin = `https://${ghOwner}.github.io/${ghRepoName}`;
 
-  // Strip the /manage/editor prefix to get the subpath within public/
-  let subpath = path.slice('/manage/editor'.length);
-  if (!subpath || subpath === '/') subpath = '/index.html';
+  // Strip /manage to get the GitHub Pages path.
+  // /manage/editor/ -> /editor/index.html, /manage/css/* -> /css/*, etc.
+  let subpath = path.slice('/manage'.length);
+  if (subpath === '/editor' || subpath === '/editor/') subpath = '/editor/index.html';
 
   const pagesUrl = pagesOrigin + subpath;
   const resp = await fetch(pagesUrl, {
@@ -507,15 +541,13 @@ export default {
       });
     }
 
-    // Editor proxy — serve the GitHub Pages editor from the Worker domain so
-    // the CF Access cookie covers the page and all its API calls.  CF Access
-    // gates /manage/* at the edge; no extra auth needed in the browser.
-    // Redirect /manage/editor → /manage/editor/ so relative asset paths
-    // (css/editor.css, js/app.js) resolve under the proxy prefix.
+    // Editor proxy — serve the GitHub Pages editor and its shared assets
+    // (css/, js/, coi-serviceworker.js) from the Worker domain so the
+    // CF Access cookie covers the page and all its API calls.
     if (path === "/manage/editor") {
       return Response.redirect(url.origin + "/manage/editor/", 301);
     }
-    if (path.startsWith("/manage/editor/")) {
+    if (path.startsWith("/manage/editor/") || path.startsWith("/manage/css/") || path.startsWith("/manage/js/") || path === "/manage/coi-serviceworker.js") {
       return handleEditorProxy(request, env, path);
     }
 
@@ -539,6 +571,11 @@ export default {
     if (path === "/manage/api/rename" && request.method === "POST") {
       return withCors(await handleRename(request, env), request);
     }
+    // Public read-only list API (no auth — used by the vault page)
+    if (path === "/api/list" && request.method === "GET") {
+      return handlePublicList(request, env);
+    }
+
     // Public file serving
     if (request.method === "GET" || request.method === "HEAD") {
       return handleGet(request, env);
@@ -559,169 +596,7 @@ const MANAGE_HTML = `<!DOCTYPE html>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=New+Rocker&family=Texturina:ital,opsz,wght@0,12..44,100..900;1,12..44,100..900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --bg:        #0f1117;
-    --surface:   #1a1f2e;
-    --surface2:  #222736;
-    --border:    rgba(255,255,255,0.1);
-    --text:      #e0e4ee;
-    --text-dim:  #8b8fa8;
-    --accent:    #00f0c2;
-    --accent-dk: #00796b;
-    --danger:    #f85149;
-    --success:   #00f0c2;
-    --glow:      0 0 12px rgba(0,240,194,0.25);
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'Texturina', Georgia, serif;
-    background: var(--bg); color: var(--text);
-    max-width: 980px; margin: 0 auto; padding: 32px 20px;
-    background-image: radial-gradient(ellipse at 50% 0%, rgba(0,121,107,0.12) 0%, transparent 60%);
-    min-height: 100vh;
-  }
-
-  /* Header */
-  header { margin-bottom: 32px; border-bottom: 1px solid var(--border); padding-bottom: 20px; display: flex; align-items: center; justify-content: space-between; }
-  h1 {
-    font-family: 'New Rocker', serif;
-    font-size: 2rem; font-weight: normal; letter-spacing: 0.04em;
-    color: var(--accent);
-    text-shadow: var(--glow);
-  }
-  h1 .sub {
-    display: block; font-family: 'Texturina', Georgia, serif;
-    font-size: 0.85rem; color: var(--text-dim); font-weight: normal;
-    letter-spacing: 0.01em; margin-top: 2px;
-  }
-
-  /* Tabs */
-  .tabs { display: flex; gap: 0; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
-  .tabs button {
-    padding: 9px 22px;
-    border: 1px solid transparent; border-bottom: none;
-    background: transparent; color: var(--text-dim); cursor: pointer;
-    font-family: 'JetBrains Mono', monospace; font-size: 0.82rem;
-    border-radius: 6px 6px 0 0;
-    transition: color 0.15s, background 0.15s;
-    position: relative; bottom: -1px;
-  }
-  .tabs button:hover { color: var(--text); }
-  .tabs button.active {
-    background: var(--surface); color: var(--accent);
-    border-color: var(--border); border-bottom-color: var(--surface);
-  }
-  /* Upload zone */
-  .upload-zone {
-    border: 2px dashed var(--border); border-radius: 8px; padding: 44px;
-    text-align: center; cursor: pointer;
-    transition: border-color 0.2s, box-shadow 0.2s;
-    margin-bottom: 18px; background: var(--surface);
-  }
-  .upload-zone:hover, .upload-zone.dragover {
-    border-color: var(--accent);
-    box-shadow: var(--glow);
-  }
-  .upload-zone p { color: var(--text-dim); font-size: 0.9rem; }
-  .upload-zone p strong { color: var(--accent); }
-  .quality-row {
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-    margin-top: 12px; font-size: 0.78rem; color: var(--text-dim);
-  }
-  .quality-row label { font-weight: 600; color: var(--text); }
-  .quality-row input[type="range"] {
-    -webkit-appearance: none; appearance: none; width: 120px; height: 14px;
-    background: var(--border); border-radius: 7px; outline: none; cursor: pointer;
-  }
-  .quality-row input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
-    background: var(--accent); border: none; cursor: pointer;
-  }
-  .quality-row input[type="range"]::-moz-range-thumb {
-    width: 14px; height: 14px; border-radius: 50%;
-    background: var(--accent); border: none; cursor: pointer;
-  }
-  .quality-row input[type="range"]::-moz-range-track {
-    height: 14px; background: var(--border); border-radius: 7px; border: none;
-  }
-  /* Prefix selector */
-
-  /* File list */
-  .file-list { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface); }
-  .file-row {
-    display: flex; flex-wrap: wrap; align-items: center; padding: 10px 16px; gap: 4px 12px;
-    border-bottom: 1px solid var(--border); font-size: 0.82rem;
-    transition: background 0.1s;
-  }
-  .file-row:last-child { border-bottom: none; }
-  .file-row:hover { background: var(--surface2); }
-  .file-row .name { flex: 1 1 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--text); cursor: pointer; }
-  .file-row .name:hover { color: var(--accent); }
-  .file-row .meta { display: flex; gap: 12px; align-items: center; flex: 1; min-width: 0; }
-  .file-row .size { color: var(--text-dim); white-space: nowrap; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; }
-  .file-row .date { color: var(--text-dim); white-space: nowrap; font-size: 0.75rem; }
-  .file-row .actions { display: flex; gap: 6px; flex-shrink: 0; margin-left: auto; }
-  .file-row .actions .btn[disabled] { opacity: 0.3; pointer-events: none; }
-  .badge-transcode {
-    display: inline-block; padding: 2px 8px; border-radius: 10px;
-    font-size: 0.68rem; font-family: 'JetBrains Mono', monospace;
-    background: rgba(255, 170, 50, 0.15); color: #ffaa32;
-    border: 1px solid rgba(255, 170, 50, 0.3);
-    animation: pulse-badge 2s ease-in-out infinite;
-    white-space: nowrap;
-  }
-  @keyframes pulse-badge {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-  }
-
-  button.btn, a.btn {
-    padding: 4px 11px; border-radius: 4px; border: 1px solid var(--border);
-    background: var(--surface2); color: var(--text-dim); cursor: pointer;
-    font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
-    transition: color 0.15s, border-color 0.15s;
-    text-decoration: none; display: inline-block; line-height: 1.4;
-  }
-  button.btn:hover, a.btn:hover { color: var(--accent); border-color: var(--accent); }
-  button.btn.danger { color: #d4453a; border-color: rgba(248,81,73,0.35); }
-  button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
-
-  /* Status */
-  .status {
-    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 900;
-    padding: 9px 20px; border-radius: 6px;
-    font-size: 0.84rem; font-family: 'JetBrains Mono', monospace;
-    border-left: 3px solid; pointer-events: none; transition: opacity 0.3s; max-width: 90vw;
-  }
-  .status:empty { display: none; }
-  .status.ok  { background: rgba(0,240,194,0.15); color: var(--success); border-color: var(--accent); }
-  .status.err { background: rgba(248,81,73,0.15); color: var(--danger);  border-color: var(--danger); }
-
-  .empty   { padding: 48px; text-align: center; color: var(--text-dim); font-size: 0.9rem; }
-  .loading { padding: 24px; text-align: center; color: var(--text-dim); font-size: 0.85rem; }
-
-  /* Preview modal */
-  .preview-overlay {
-    position: fixed; inset: 0; z-index: 800; background: rgba(0,0,0,0.8);
-    display: flex; align-items: center; justify-content: center; cursor: pointer;
-  }
-  .preview-overlay img, .preview-overlay video {
-    max-width: 90vw; max-height: 85vh; border-radius: 8px; background: #000; cursor: default;
-  }
-  .preview-overlay .close-btn {
-    position: absolute; top: 12px; right: 18px; color: var(--text);
-    font-size: 1.8rem; cursor: pointer; line-height: 1; background: none; border: none;
-    font-family: 'JetBrains Mono', monospace;
-  }
-  .preview-overlay .close-btn:hover { color: var(--accent); }
-
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: var(--bg); }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: var(--accent-dk); }
-</style>
+<link rel="stylesheet" href="/manage/css/vault.css">
 </head>
 <body>
 

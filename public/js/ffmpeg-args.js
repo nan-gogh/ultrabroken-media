@@ -80,7 +80,9 @@ export function buildFFmpegArgs(job, opts = {}) {
       const duration = clip.end - clip.start;
       args.push('-t', String(Math.round(duration * 1000) / 1000));
     }
-    // Lossless intermediate: ultrafast encode, PCM audio — fast and lossless enough for trimming
+    // Lossless intermediate: ultrafast encode, PCM audio — fast and lossless enough for trimming.
+    // -threads 1: prevent libx264 from trying to spawn more pthreads than the WASM pool allows.
+    args.push('-threads', '1');
     args.push('-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '0');
     args.push('-c:a', 'pcm_s16le');
     args.push('-y', outputFile);
@@ -112,6 +114,7 @@ export function buildFFmpegArgs(job, opts = {}) {
 
   const finalCommand = [
     '-f', 'concat', '-safe', '0', '-i', 'concat_list.txt',
+    '-threads', '1',
     '-c:v', 'libx264', '-crf', '30', '-preset', preset,
     '-vf', vf,
     '-af', 'asetpts=PTS-STARTPTS',

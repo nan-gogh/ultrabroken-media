@@ -99,8 +99,8 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 .library-row:last-child { border-bottom: none; }
 .library-row:hover { background: var(--surface2); }
 .library-row .name {
-  flex: 1 1 0; min-width: 0; max-width: 100%; font-family: 'JetBrains Mono', monospace;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;
+  flex: 1 1 100%; min-width: 0; font-family: 'JetBrains Mono', monospace;
+  word-break: break-all; cursor: pointer;
 }
 .library-row .name:hover { color: var(--accent); }
 .lib-controls {
@@ -167,7 +167,7 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 }
 .clip-editor .editor-name {
   font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; color: var(--accent);
-  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  flex: 1 1 100%; min-width: 0; word-break: break-all;
 }
 .clip-editor .editor-dur {
   font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-dim);

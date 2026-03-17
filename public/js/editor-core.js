@@ -353,6 +353,8 @@ export function renderTimeline() {
   }
   tl.innerHTML = html;
   document.getElementById('clipCount').textContent = clips.length > 0 ? clips.length + ' clip(s)' : '';
+  const totalDur = getTotalDuration();
+  document.getElementById('timelineTotal').textContent = totalDur > 0 ? fmtTime(totalDur) : '';
   renderOverlayTotal();
 }
 
@@ -388,12 +390,12 @@ export function renderEditor() {
   const c = clips[selectedIndex];
   const maxVal = c.duration > 0 ? c.duration : 100;
   const endVal = (c.end === -1 || c.end > maxVal) ? maxVal : c.end;
-  const durText = c.duration > 0 ? c.duration.toFixed(1) + 's total' : '?';
-  const trimDur = c.duration > 0 ? (endVal - c.start).toFixed(1) + 's' : '';
+  const totalSec = c.duration > 0 ? c.duration.toFixed(1) : '?';
+  const usingSec = c.duration > 0 ? (endVal - c.start).toFixed(1) : '?';
   panel.innerHTML =
     `<div class="editor-info">`
     + `<span class="editor-name" title="${escHtml(c.key)}">${escHtml(c.name)}</span>`
-    + `<span class="editor-dur">${durText}</span></div>`
+    + `</div>`
     + `<div class="editor-times">`
     + `<input type="number" inputmode="decimal" min="0" step="0.1" value="${c.start.toFixed(1)}" onchange="onNumIn(0,this.value)" title="Start">`
     + `<span>&rarr;</span>`
@@ -404,7 +406,7 @@ export function renderEditor() {
     + `<input type="range" min="0" max="${maxVal}" step="0.1" value="${c.start}" oninput="onEditorRange(0,this.value)">`
     + `<input type="range" min="0" max="${maxVal}" step="0.1" value="${endVal}" oninput="onEditorRange(1,this.value)">`
     + `</div>`
-    + `<div class="using-label">Using ${trimDur || '?'}</div>`;
+    + `<div class="using-label">Using ${usingSec} of ${totalSec} seconds</div>`;
 }
 
 window.onEditorRange = function(handle, val) {

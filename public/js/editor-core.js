@@ -206,24 +206,6 @@ window.addLocalClip = function(key) {
 window.compressLibraryFile = async function(key) {
   const f = localLibrary.find(x => x.key === key);
   if (!f || f.compressed) return;
-  // Pre-flight: probe duration if unknown, then check bitrate
-  if (!f.duration) {
-    f.duration = await new Promise(resolve => {
-      const v = document.createElement('video');
-      v.preload = 'metadata';
-      const url = URL.createObjectURL(f._file);
-      v.onloadedmetadata = () => { URL.revokeObjectURL(url); resolve(v.duration || 0); };
-      v.onerror = () => { URL.revokeObjectURL(url); resolve(0); };
-      v.src = url;
-    });
-  }
-  if (f.duration > 0) {
-    const kbps = (f.size * 8 / f.duration) / 1000;
-    if (kbps <= 1500) {
-      showStatus(f.name + ' \u2014 already well compressed (' + Math.round(kbps) + ' kbps)', true);
-      return;
-    }
-  }
   clearLog();
   appendLog('Compressing ' + f.name + '…');
   setProgress(true, 0);

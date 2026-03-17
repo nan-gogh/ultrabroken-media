@@ -278,7 +278,7 @@ export class LocalBackend {
       await this.ffmpeg.writeFile(inName, await fetchFile(file));
       await this._exec([
         '-i', inName,
-        '-c:v', 'libx264', '-crf', '30', '-preset', 'medium',
+        '-c:v', 'libx264', '-crf', '24', '-preset', 'medium',
         '-vf', "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease",
         '-r', '24',
         '-c:a', 'aac', '-b:a', '64k',

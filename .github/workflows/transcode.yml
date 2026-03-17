@@ -67,26 +67,9 @@ jobs:
             original_size=$(stat -c%s "input.$ext_lower")
             echo "Original: $(numfmt --to=iec $original_size)"
 
-            # Probe duration and compute original bitrate for maxrate cap
-            # ffmpeg -i always exits 1 (no output file), so capture separately
-            probe_out=$(ffmpeg -i "input.$ext_lower" 2>&1 || true)
-            dur=$(echo "$probe_out" | grep -oE 'Duration: [0-9:.]+' | head -1 | sed 's/Duration: //')
-            if [ -n "$dur" ]; then
-              total_secs=$(echo "$dur" | awk -F: '{printf "%.0f", $1*3600 + $2*60 + $3}')
-              if [ "$total_secs" -gt 0 ] 2>/dev/null; then
-                orig_kbps=$(( original_size * 8 / total_secs / 1000 ))
-                echo "Original bitrate: ${orig_kbps} kbps"
-                maxrate_args="-maxrate ${orig_kbps}k -bufsize $((orig_kbps * 2))k"
-              else
-                maxrate_args=""
-              fi
-            else
-              maxrate_args=""
-            fi
-
-            # Transcode: H.264+AAC, max 720p24, CRF 30, capped at original bitrate
+            # Transcode: H.264+AAC, max 720p24, CRF 24
             ffmpeg -i "input.$ext_lower" \
-              -c:v libx264 -crf 30 -preset slow $maxrate_args \
+              -c:v libx264 -crf 24 -preset slow \
               -vf "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease" \
               -r 24 \
               -c:a aac -b:a 64k \

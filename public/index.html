@@ -27,8 +27,6 @@ if (!location.pathname.startsWith('/manage/editor')) {
   </div>
 </header>
 
-<div id="status"></div>
-
 <div class="section">
   <div class="section-header">Preview</div>
   <div class="preview" id="previewBox">
@@ -83,8 +81,8 @@ if (!location.pathname.startsWith('/manage/editor')) {
   </div>
 </div>
 
-<!-- Processing panel: progress + full log — shown only while work is in progress -->
-<div class="section" id="processingSection" hidden>
+<!-- Processing panel: always visible, idle when no work is running -->
+<div class="section" id="processingSection">
   <div class="section-header">
     <span id="processingStep">Processing…</span>
     <span style="margin-left:auto;display:flex;gap:8px;align-items:center;">
@@ -95,7 +93,7 @@ if (!location.pathname.startsWith('/manage/editor')) {
   <div class="progress-track-wrap">
     <div class="progress-track"><div class="progress-bar" id="progressBar"></div></div>
   </div>
-  <textarea id="processingLog" class="processing-log" readonly spellcheck="false"></textarea>
+  <div id="processingLog" class="processing-log"></div>
 </div>
 
 <script type="module" src="js/app.js"></script>

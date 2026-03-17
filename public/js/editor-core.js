@@ -41,6 +41,9 @@ export function initEditor(b) {
   if (backend.mode === 'local' && typeof backend.onLog !== 'undefined') {
     backend.onLog = (msg) => appendLog(msg);
   }
+  wireDragScroll(document.getElementById('processingLog'));
+  document.getElementById('processingSection').classList.add('idle');
+  document.getElementById('processingStep').textContent = 'Ready';
   applyModeUI();
   if (backend.mode === 'remote') {
     loadLibrary();
@@ -73,21 +76,29 @@ function applyModeUI() {
 
   // Warning banner for single-threaded mode
   if (!isRemote && !crossOriginIsolated) {
-    showStatus('Processing in single-threaded mode — this may be slower', true, 0);
+    appendLog('⚠ Single-threaded mode — this may be slower');
   }
 }
 
 // ── Status messages ────────────────────────────────────────────────────────
 
 let statusTimer = null;
+let idleTimer   = null;
 
-export function showStatus(msg, ok, duration) {
-  const el = document.getElementById('status');
-  el.className = 'status ' + (ok ? 'ok' : 'err');
-  el.textContent = msg;
-  if (statusTimer) clearTimeout(statusTimer);
-  if (duration !== 0) {
-    statusTimer = setTimeout(() => { el.textContent = ''; el.className = 'status'; }, duration || 8000);
+// Routes all status messages to the processing log panel.
+// Errors additionally flash the step label red for 5 s.
+export function showStatus(msg, ok) {
+  appendLog((ok ? '' : '✖ ') + msg);
+  if (!ok) {
+    const step    = document.getElementById('processingStep');
+    const section = document.getElementById('processingSection');
+    step.textContent = msg;
+    step.classList.add('err');
+    if (statusTimer) clearTimeout(statusTimer);
+    statusTimer = setTimeout(() => {
+      step.classList.remove('err');
+      if (section.classList.contains('idle')) step.textContent = 'Ready';
+    }, 5000);
   }
 }
 
@@ -96,13 +107,13 @@ export function showStatus(msg, ok, duration) {
 export function appendLog(msg) {
   const el = document.getElementById('processingLog');
   if (!el) return;
-  el.value += msg + '\n';
+  el.textContent += msg + '\n';
   el.scrollTop = el.scrollHeight;
 }
 
 function clearLog() {
   const el = document.getElementById('processingLog');
-  if (el) el.value = '';
+  if (el) el.textContent = '';
 }
 
 // ── Local file picker ──────────────────────────────────────────────────────
@@ -192,7 +203,6 @@ window.compressLibraryFile = async function(key) {
   if (!f || f.compressed) return;
   clearLog();
   appendLog('Compressing ' + f.name + '…');
-  showStatus('Compressing ' + f.name + '\u2026', true, 0);
   setProgress(true, 0);
   document.getElementById('processingStep').textContent = 'Compressing ' + f.name + '\u2026';
   try {
@@ -644,13 +654,11 @@ async function runLocalExport(job, name) {
   clearLog();
   setProgress(true, 0);
   document.getElementById('processingStep').textContent = 'Processing\u2026';
-  showStatus('Processing\u2026', true, 0);
 
   const result = await backend.execute(job, (ratio, step) => {
     if (cancelRequested) throw new Error('cancelled');
     setProgress(true, ratio);
     if (step) {
-      showStatus(step, true, 0);
       appendLog('\u2192 ' + step);
       document.getElementById('processingStep').textContent = step;
     }
@@ -695,13 +703,46 @@ function setProgress(visible, ratio, finished) {
   const bar     = document.getElementById('progressBar');
   const label   = document.getElementById('progressLabel');
   const cancel  = document.getElementById('cancelBtn');
-  section.hidden = !visible;
-  if (visible) {
-    const pct = Math.round((ratio || 0) * 100);
-    bar.style.width = pct + '%';
-    label.textContent = pct + '%';
-    cancel.hidden = !!finished;
+  if (!visible) {
+    if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+    section.classList.add('idle');
+    return;
   }
+  if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+  section.classList.remove('idle');
+  const pct = Math.round((ratio || 0) * 100);
+  bar.style.width = pct + '%';
+  label.textContent = pct + '%';
+  cancel.hidden = !!finished;
+  if (finished) {
+    idleTimer = setTimeout(() => {
+      section.classList.add('idle');
+      const step = document.getElementById('processingStep');
+      step.textContent = 'Ready';
+      step.classList.remove('err');
+    }, 4000);
+  }
+}
+
+function wireDragScroll(el) {
+  if (!el) return;
+  let isDown = false, startX, startY, scrollLeft, scrollTop;
+  el.addEventListener('mousedown', e => {
+    isDown = true;
+    startX = e.clientX; startY = e.clientY;
+    scrollLeft = el.scrollLeft; scrollTop = el.scrollTop;
+    el.classList.add('dragging');
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', e => {
+    if (!isDown) return;
+    el.scrollLeft = scrollLeft - (e.clientX - startX);
+    el.scrollTop  = scrollTop  - (e.clientY - startY);
+  });
+  window.addEventListener('mouseup', () => {
+    isDown = false;
+    el.classList.remove('dragging');
+  });
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────

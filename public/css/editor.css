@@ -59,16 +59,6 @@ button.btn.primary:hover { background: var(--accent); color: var(--bg); }
 button.btn.danger { color: #d4453a; border-color: rgba(248,81,73,0.35); }
 button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 
-/* ── Status ── */
-.status {
-  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 900;
-  padding: 9px 20px; border-radius: 6px; font-size: 0.84rem;
-  font-family: 'JetBrains Mono', monospace; border-left: 3px solid;
-  pointer-events: none; transition: opacity 0.3s; max-width: 90vw;
-}
-.status:empty { display: none; }
-.status.ok  { background: rgba(0,240,194,0.15); color: var(--success); border-color: var(--accent); }
-.status.err { background: rgba(248,81,73,0.15); color: var(--danger); border-color: var(--danger); }
 
 /* ── Sections ── */
 .section {
@@ -308,7 +298,20 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
   white-space: pre;
   overflow-wrap: normal;
   overflow-x: auto;
+  overflow-y: auto;
+  outline: none;
+  cursor: default;
+  user-select: text;
+  -webkit-user-select: text;
 }
+.processing-log.dragging { cursor: grabbing !important; }
+
+/* Idle state: hide progress chrome, dim step label */
+#processingSection.idle .progress-track-wrap { display: none; }
+#processingSection.idle #progressLabel { display: none; }
+#processingSection.idle #cancelBtn { display: none; }
+#processingSection.idle #processingStep { opacity: 0.45; }
+#processingStep.err { color: var(--danger); opacity: 1 !important; }
 
 /* ── Settings panel ── */
 .settings-panel {

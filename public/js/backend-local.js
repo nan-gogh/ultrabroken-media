@@ -84,35 +84,33 @@ export class LocalBackend {
    * Safe to call again after a terminate() — it reinitialises cleanly.
    */
   async init() {
-    console.log('[ffmpeg] Loading modules…');
+    this.onLog?.('Loading FFmpeg modules…');
     const { FFmpeg, toBlobURL } = await loadModules();
 
     this.ffmpeg = new FFmpeg();
 
     this.ffmpeg.on('log', ({ message }) => {
-      console.debug('[ffmpeg]', message);
       this.onLog?.(message);
     });
 
     // The FFmpeg class worker must be same-origin.  We self-host the 5 KB
     // worker.js + its two tiny dependency modules in public/js/vendor/.
     const classWorkerURL = new URL(CLASS_WORKER_PATH, location.href).href;
-    console.log('[ffmpeg] classWorkerURL:', classWorkerURL, 'crossOriginIsolated =', crossOriginIsolated);
 
     if (crossOriginIsolated) {
       const coreURL   = await toBlobURL(`${CORE_MT_BASE}/ffmpeg-core.js`,        'text/javascript');
       const wasmURL   = await toBlobURL(`${CORE_MT_BASE}/ffmpeg-core.wasm`,      'application/wasm');
       const workerURL = await toBlobURL(`${CORE_MT_BASE}/ffmpeg-core.worker.js`, 'text/javascript');
-      console.log('[ffmpeg] Loading multi-threaded core…');
+      this.onLog?.('Loading multi-threaded core…');
       await this.ffmpeg.load({ classWorkerURL, coreURL, wasmURL, workerURL });
     } else {
       const coreURL = await toBlobURL(`${CORE_BASE}/ffmpeg-core.js`,   'text/javascript');
       const wasmURL = await toBlobURL(`${CORE_BASE}/ffmpeg-core.wasm`, 'application/wasm');
-      console.log('[ffmpeg] Loading single-threaded core…');
+      this.onLog?.('Loading single-threaded core…');
       await this.ffmpeg.load({ classWorkerURL, coreURL, wasmURL });
     }
 
-    console.log('[ffmpeg] Loaded successfully');
+    this.onLog?.('FFmpeg loaded');
     this.loaded = true;
   }
 
@@ -129,7 +127,7 @@ export class LocalBackend {
    */
   async execute(job, onProgress) {
     if (!this.loaded) {
-      console.log('[ffmpeg] First run — initialising…');
+      this.onLog?.('Initialising FFmpeg…');
       await this.init();
     }
 
@@ -147,7 +145,7 @@ export class LocalBackend {
       preset: 'medium',
       fontFile: hasOverlays ? 'font.ttf' : undefined,
     });
-    console.log('[ffmpeg] Job:', args.trimCommands.length, 'trim(s), final command:', args.finalCommand.join(' '));
+    this.onLog?.('[job] ' + args.trimCommands.length + ' clip(s) • ffmpeg ' + args.finalCommand.join(' '));
     const totalSteps  = args.trimCommands.length + 1;
     let   stepsDone   = 0;
 
@@ -182,18 +180,14 @@ export class LocalBackend {
       for (const [i, clip] of job.clips.entries()) {
         onProgress?.(stepsDone / totalSteps, `Loading clip ${i + 1}/${job.clips.length}…`);
         const name = `clip_${i}.mp4`;
-        console.log(`[ffmpeg] Writing ${name} (${clip._file?.size || '?'} bytes)…`);
         await this.ffmpeg.writeFile(name, await fetchFile(clip._file));
-        console.log(`[ffmpeg] ${name} written`);
         writtenFiles.push(name);
       }
 
       // 3. Trim each clip to its in/out range.
       for (const [i, trimCmd] of args.trimCommands.entries()) {
         onProgress?.(stepsDone / totalSteps, `Trimming clip ${i + 1}/${args.trimCommands.length}…`);
-        console.log(`[ffmpeg] Trim ${i}:`, trimCmd.join(' '));
         await this._exec(trimCmd);
-        console.log(`[ffmpeg] Trim ${i} done`);
         stepsDone++;
         writtenFiles.push(trimCmd[trimCmd.length - 1]);
       }
@@ -204,9 +198,7 @@ export class LocalBackend {
 
       // 5. Final concat + transcode.
       onProgress?.(stepsDone / totalSteps, 'Encoding final output…');
-      console.log('[ffmpeg] Final encode:', args.finalCommand.join(' '));
       await this._exec(args.finalCommand);
-      console.log('[ffmpeg] Final encode done');
       writtenFiles.push('output.mp4');
 
       // 6. Read the output back as a Blob.

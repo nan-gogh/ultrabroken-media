@@ -30,9 +30,12 @@ const UTIL_ESM   = `${UNPKG}/@ffmpeg/util@${UTIL_VERSION}/dist/esm/index.js`;
 const CORE_BASE    = `${UNPKG}/@ffmpeg/core@${CORE_VERSION}/dist/esm`;
 const CORE_MT_BASE = `${UNPKG}/@ffmpeg/core-mt@${CORE_VERSION}/dist/esm`;
 
-// The FFmpeg class itself spawns a Web Worker — under COEP (crossOriginIsolated)
-// a cross-origin Worker URL is blocked.  Convert it to a same-origin blob URL.
-const CLASS_WORKER = `${UNPKG}/@ffmpeg/ffmpeg@${FFMPEG_VERSION}/dist/esm/worker.js`;
+// The FFmpeg class worker is self-hosted so it runs from the page's origin.
+// When loaded from a blob URL, the worker's relative imports (./const.js,
+// ./errors.js) fail silently because blob: has an opaque origin — and
+// import(blobCoreURL) inside a blob-origin module worker never resolves
+// in some browsers.  Serving from the same origin avoids all of this.
+const CLASS_WORKER_PATH = 'js/vendor/ffmpeg-worker.js';
 
 // ─── Lazy module cache ───────────────────────────────────────────────────────
 
@@ -88,11 +91,10 @@ export class LocalBackend {
       console.debug('[ffmpeg]', message);
     });
 
-    // The FFmpeg class worker must be a blob URL too, otherwise
-    // new Worker(unpkg_url) is blocked by COEP.
-    console.log('[ffmpeg] Creating blob URLs…');
-    const classWorkerURL = await toBlobURL(CLASS_WORKER, 'text/javascript');
-    console.log('[ffmpeg] classWorkerURL ready, crossOriginIsolated =', crossOriginIsolated);
+    // The FFmpeg class worker must be same-origin.  We self-host the 5 KB
+    // worker.js + its two tiny dependency modules in public/js/vendor/.
+    const classWorkerURL = new URL(CLASS_WORKER_PATH, location.href).href;
+    console.log('[ffmpeg] classWorkerURL:', classWorkerURL, 'crossOriginIsolated =', crossOriginIsolated);
 
     if (crossOriginIsolated) {
       const coreURL   = await toBlobURL(`${CORE_MT_BASE}/ffmpeg-core.js`,        'text/javascript');

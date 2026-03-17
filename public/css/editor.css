@@ -272,8 +272,11 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
   margin: 0 16px 16px;
   display: flex; align-items: center; gap: 10px;
 }
+.progress-track-wrap {
+  padding: 6px 16px 2px;
+}
 .progress-track {
-  flex: 1; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden;
+  width: 100%; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden;
 }
 .progress-bar {
   height: 100%; width: 0; background: var(--accent); border-radius: 3px;
@@ -282,6 +285,29 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 .progress-label {
   font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--text-dim);
   min-width: 36px; text-align: right;
+}
+
+/* ── Processing log ── */
+.processing-log {
+  display: block;
+  width: 100%;
+  height: 180px;
+  min-height: 80px;
+  max-height: 480px;
+  resize: vertical;
+  box-sizing: border-box;
+  margin: 6px 0 0;
+  padding: 8px 16px;
+  background: var(--bg);
+  border: none;
+  border-top: 1px solid var(--border);
+  color: var(--text-dim);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
 }
 
 /* ── Settings panel ── */

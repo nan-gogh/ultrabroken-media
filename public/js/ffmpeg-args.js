@@ -46,6 +46,10 @@
  *   x264 preset for the final concat+transcode pass. The Actions workflow uses
  *   'slow' for maximum quality. Local (browser) mode defaults to 'medium' to
  *   keep processing time tolerable while still producing good output.
+ * @property {string} [fontFile]
+ *   Path to a font file in the FFmpeg virtual FS to use for drawtext overlays.
+ *   Required when running inside FFmpeg.wasm, which has no system fonts.
+ *   Example: `'font.ttf'` (written to the VFS root before encode).
  */
 
 /**
@@ -100,6 +104,7 @@ export function buildFFmpegArgs(job, opts = {}) {
       vf += `,drawtext=text='${safeText}'`
         + `:enable='between(t,${ov.start},${ov.end})'`
         + `:fontsize=36:fontcolor=white`
+        + (opts.fontFile ? `:fontfile=${opts.fontFile}` : '')
         + `:x=(w-tw)/2:y=h-th-40`
         + `:box=1:boxcolor=black@0.5:boxborderw=8`;
     }

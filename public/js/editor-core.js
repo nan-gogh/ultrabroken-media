@@ -38,6 +38,9 @@ let localLibrary = [];  // { key, name, size, _file }
 
 export function initEditor(b) {
   backend = b;
+  if (backend.mode === 'local' && typeof backend.onLog !== 'undefined') {
+    backend.onLog = (msg) => appendLog(msg);
+  }
   applyModeUI();
   if (backend.mode === 'remote') {
     loadLibrary();
@@ -86,6 +89,20 @@ export function showStatus(msg, ok, duration) {
   if (duration !== 0) {
     statusTimer = setTimeout(() => { el.textContent = ''; el.className = 'status'; }, duration || 8000);
   }
+}
+
+// ── Processing log ─────────────────────────────────────────────────────────
+
+export function appendLog(msg) {
+  const el = document.getElementById('processingLog');
+  if (!el) return;
+  el.value += msg + '\n';
+  el.scrollTop = el.scrollHeight;
+}
+
+function clearLog() {
+  const el = document.getElementById('processingLog');
+  if (el) el.value = '';
 }
 
 // ── Local file picker ──────────────────────────────────────────────────────
@@ -173,8 +190,11 @@ window.addLocalClip = function(key) {
 window.compressLibraryFile = async function(key) {
   const f = localLibrary.find(x => x.key === key);
   if (!f || f.compressed) return;
+  clearLog();
+  appendLog('Compressing ' + f.name + '…');
   showStatus('Compressing ' + f.name + '\u2026', true, 0);
   setProgress(true, 0);
+  document.getElementById('processingStep').textContent = 'Compressing ' + f.name + '\u2026';
   try {
     const { blob, duration } = await backend.importFile(f._file, ratio => {
       setProgress(true, ratio);
@@ -621,18 +641,25 @@ export async function doExport(forceOverwrite) {
 
 async function runLocalExport(job, name) {
   cancelRequested = false;
+  clearLog();
   setProgress(true, 0);
-  showStatus('Processing…', true, 0);
+  document.getElementById('processingStep').textContent = 'Processing\u2026';
+  showStatus('Processing\u2026', true, 0);
 
   const result = await backend.execute(job, (ratio, step) => {
     if (cancelRequested) throw new Error('cancelled');
     setProgress(true, ratio);
-    if (step) showStatus(step, true, 0);
+    if (step) {
+      showStatus(step, true, 0);
+      appendLog('\u2192 ' + step);
+      document.getElementById('processingStep').textContent = step;
+    }
   });
 
   if (!result) { setProgress(false); return; } // cancelled
 
   setProgress(true, 1, true); // keep visible at 100%, hide cancel
+  document.getElementById('processingStep').textContent = 'Done';
 
   // Trigger browser download
   const url = URL.createObjectURL(result);
@@ -664,11 +691,11 @@ export function cancelExport() {
 }
 
 function setProgress(visible, ratio, finished) {
-  const wrap = document.getElementById('progressWrap');
-  const bar = document.getElementById('progressBar');
-  const label = document.getElementById('progressLabel');
-  const cancel = document.getElementById('cancelBtn');
-  wrap.hidden = !visible;
+  const section = document.getElementById('processingSection');
+  const bar     = document.getElementById('progressBar');
+  const label   = document.getElementById('progressLabel');
+  const cancel  = document.getElementById('cancelBtn');
+  section.hidden = !visible;
   if (visible) {
     const pct = Math.round((ratio || 0) * 100);
     bar.style.width = pct + '%';

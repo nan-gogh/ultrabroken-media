@@ -276,15 +276,16 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
   padding: 6px 16px 2px;
 }
 .progress-track {
-  width: 100%; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden;
+  position: relative; width: 100%; height: 18px; background: var(--bg); border-radius: 9px; overflow: hidden;
 }
 .progress-bar {
-  height: 100%; width: 0; background: var(--accent); border-radius: 3px;
+  height: 100%; width: 0; background: var(--accent); border-radius: 9px;
   transition: width 0.2s;
 }
 .progress-label {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--text-dim);
-  min-width: 36px; text-align: right;
+  position: absolute; top: 0; right: 6px; bottom: 0; display: flex; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: var(--text-dim);
+  pointer-events: none;
 }
 
 /* ── Processing log ── */
@@ -321,12 +322,8 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 #processingSection.idle #cancelBtn { display: none; }
 #processingSection.idle #processingStep { opacity: 0.45; }
 #processingStep.err { color: var(--danger); opacity: 1 !important; }
-#processingSection .section-header { flex-wrap: wrap; }
 #processingStep {
   flex: 1 1 auto; min-width: 0; word-break: break-all;
-}
-.processing-controls {
-  display: flex; align-items: center; gap: 8px;
 }
 
 /* ── Settings panel ── */

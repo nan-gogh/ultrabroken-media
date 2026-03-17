@@ -227,11 +227,14 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 }
 .overlay-row:last-child { border-bottom: none; }
 .overlay-row input[type="text"] {
-  flex: 1; min-width: 120px; background: var(--bg); border: 1px solid var(--border);
+  flex: 1 0 auto; min-width: 180px; background: var(--bg); border: 1px solid var(--border);
   border-radius: 3px; color: var(--text); padding: 4px 8px;
   font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
 }
 .overlay-row input[type="text"]:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+.ov-controls {
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
 .overlay-row input[type="number"] {
   width: 58px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px;
   color: var(--text); padding: 4px 6px; font-family: 'JetBrains Mono', monospace;
@@ -300,11 +303,10 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
   overflow-x: auto;
   overflow-y: auto;
   outline: none;
-  cursor: default;
+  cursor: auto;
   user-select: text;
   -webkit-user-select: text;
 }
-.processing-log.dragging { cursor: grabbing !important; }
 
 /* Idle state: hide progress chrome, dim step label */
 #processingSection.idle .progress-track-wrap { display: none; }

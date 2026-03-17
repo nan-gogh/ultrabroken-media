@@ -41,7 +41,6 @@ export function initEditor(b) {
   if (backend.mode === 'local' && typeof backend.onLog !== 'undefined') {
     backend.onLog = (msg) => appendLog(msg);
   }
-  wireDragScroll(document.getElementById('processingLog'));
   document.getElementById('processingSection').classList.add('idle');
   document.getElementById('processingStep').textContent = 'Ready';
   applyModeUI();
@@ -471,12 +470,14 @@ function renderOverlays() {
     const ov = overlays[i];
     html += `<div class="overlay-row">`
       + `<input type="text" value="${escHtml(ov.text)}" placeholder="Text…" oninput="onOverlayChange(${i},'text',this.value)">`
+      + `<div class="ov-controls">`
       + `<span class="ov-label">from</span>`
       + `<input type="number" min="0" step="0.1" value="${ov.start}" onchange="onOverlayChange(${i},'start',this.value)">`
       + `<span class="ov-label">to</span>`
       + `<input type="number" min="0" step="0.1" value="${ov.end}" onchange="onOverlayChange(${i},'end',this.value)">`
       + `<span class="ov-label">s</span>`
       + `<button class="btn danger" onclick="removeOverlay(${i})">&times;</button>`
+      + `</div>`
       + `</div>`;
   }
   list.innerHTML = html;
@@ -722,27 +723,6 @@ function setProgress(visible, ratio, finished) {
       step.classList.remove('err');
     }, 4000);
   }
-}
-
-function wireDragScroll(el) {
-  if (!el) return;
-  let isDown = false, startX, startY, scrollLeft, scrollTop;
-  el.addEventListener('mousedown', e => {
-    isDown = true;
-    startX = e.clientX; startY = e.clientY;
-    scrollLeft = el.scrollLeft; scrollTop = el.scrollTop;
-    el.classList.add('dragging');
-    e.preventDefault();
-  });
-  window.addEventListener('mousemove', e => {
-    if (!isDown) return;
-    el.scrollLeft = scrollLeft - (e.clientX - startX);
-    el.scrollTop  = scrollTop  - (e.clientY - startY);
-  });
-  window.addEventListener('mouseup', () => {
-    isDown = false;
-    el.classList.remove('dragging');
-  });
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────

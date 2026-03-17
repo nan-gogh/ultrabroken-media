@@ -93,31 +93,33 @@ export function buildFFmpegArgs(job, opts = {}) {
   let vf = "setpts=PTS-STARTPTS,scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease";
 
   if (job.overlays && job.overlays.length > 0) {
-    // Merge time-overlapping overlays into single text boxes
+    // Build time-segment drawtext filters so the text box content
+    // changes dynamically as individual overlays enter/exit.
     const valid = job.overlays.filter(ov => ov.text.trim());
-    const sorted = valid.slice().sort((a, b) => a.start - b.start);
-    const groups = [];
-    for (const ov of sorted) {
-      const last = groups[groups.length - 1];
-      if (last && ov.start < last.end) {
-        last.texts.push(ov.text.trim());
-        last.end = Math.max(last.end, ov.end);
-      } else {
-        groups.push({ start: ov.start, end: ov.end, texts: [ov.text.trim()] });
+    if (valid.length) {
+      // Collect all unique boundary times
+      const times = new Set();
+      for (const ov of valid) { times.add(ov.start); times.add(ov.end); }
+      const boundaries = [...times].sort((a, b) => a - b);
+
+      // For each segment, collect active overlay texts
+      for (let i = 0; i < boundaries.length - 1; i++) {
+        const segStart = boundaries[i];
+        const segEnd   = boundaries[i + 1];
+        const active = valid.filter(ov => ov.start <= segStart && ov.end >= segEnd);
+        if (!active.length) continue;
+        const safeText = active.map(ov => ov.text.trim()).join('\n')
+          .replace(/\\/g, '\\\\\\\\')
+          .replace(/'/g, '\u2019')
+          .replace(/:/g, '\\\\:')
+          .replace(/%/g, '%%%%');
+        vf += `,drawtext=text='${safeText}'`
+          + `:enable='between(t,${segStart},${segEnd})'`
+          + `:fontsize=36:fontcolor=white`
+          + (opts.fontFile ? `:fontfile=${opts.fontFile}` : '')
+          + `:x=(w-tw)/2:y=h-th-40`
+          + `:box=1:boxcolor=black@0.5:boxborderw=8`;
       }
-    }
-    for (const g of groups) {
-      const safeText = g.texts.join('\n')
-        .replace(/\\/g, '\\\\\\\\')
-        .replace(/'/g, '\u2019')
-        .replace(/:/g, '\\\\:')
-        .replace(/%/g, '%%%%');
-      vf += `,drawtext=text='${safeText}'`
-        + `:enable='between(t,${g.start},${g.end})'`
-        + `:fontsize=36:fontcolor=white`
-        + (opts.fontFile ? `:fontfile=${opts.fontFile}` : '')
-        + `:x=(w-tw)/2:y=h-th-40`
-        + `:box=1:boxcolor=black@0.5:boxborderw=8`;
     }
   }
 

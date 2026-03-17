@@ -481,7 +481,6 @@ function renderOverlays() {
       + `<input type="number" inputmode="decimal" min="0" step="0.1" value="${ov.start.toFixed(1)}" onchange="onOverlayChange(${i},'start',this.value)">`
       + `<span class="ov-label">to</span>`
       + `<input type="number" inputmode="decimal" min="0" step="0.1" value="${ov.end.toFixed(1)}" onchange="onOverlayChange(${i},'end',this.value)">`
-      + `<span class="ov-label">s</span>`
       + `<button class="btn danger" onclick="removeOverlay(${i})">&times;</button>`
       + `</div>`
       + `</div>`;

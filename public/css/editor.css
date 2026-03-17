@@ -99,12 +99,12 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 .library-row:last-child { border-bottom: none; }
 .library-row:hover { background: var(--surface2); }
 .library-row .name {
-  flex: 1 0 auto; min-width: 160px; font-family: 'JetBrains Mono', monospace; word-break: break-all;
-  cursor: pointer;
+  flex: 1 1 0; min-width: 0; max-width: 100%; font-family: 'JetBrains Mono', monospace;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;
 }
 .library-row .name:hover { color: var(--accent); }
 .lib-controls {
-  display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+  display: flex; align-items: center; gap: 6px;
 }
 .library-row .size {
   color: var(--text-dim); font-family: 'JetBrains Mono', monospace;
@@ -179,8 +179,10 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 .clip-editor .editor-times input[type="number"] {
   width: 68px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px;
   color: var(--text); padding: 3px 6px; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
-  text-align: center;
+  text-align: center; -moz-appearance: textfield;
 }
+.clip-editor .editor-times input[type="number"]::-webkit-outer-spin-button,
+.clip-editor .editor-times input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .clip-editor .editor-times input[type="number"]:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
 
 /* Dual-range slider */
@@ -241,8 +243,10 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 .overlay-row input[type="number"] {
   width: 58px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px;
   color: var(--text); padding: 4px 6px; font-family: 'JetBrains Mono', monospace;
-  font-size: 0.72rem; text-align: center;
+  font-size: 0.72rem; text-align: center; -moz-appearance: textfield;
 }
+.overlay-row input[type="number"]::-webkit-outer-spin-button,
+.overlay-row input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .overlay-row input[type="number"]:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
 .overlay-row .ov-label { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: var(--text-dim); }
 .overlay-total {

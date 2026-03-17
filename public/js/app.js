@@ -16,12 +16,16 @@ import { RemoteBackend } from './backend-remote.js';
 
 const params = new URLSearchParams(location.search);
 const forceMode = params.get('mode');
+const urlOrigin = params.get('origin');  // From Worker redirect
 
 let backend;
 
 if (forceMode === 'remote' || (!forceMode && localStorage.getItem('ub-media-token'))) {
-  const origin = localStorage.getItem('ub-media-origin') || '';
+  // Priority: URL param (from Worker redirect) > localStorage > empty
+  const origin = urlOrigin || localStorage.getItem('ub-media-origin') || '';
   const token  = localStorage.getItem('ub-media-token')  || '';
+  // If we got origin from URL param, save it to localStorage for next time
+  if (urlOrigin) localStorage.setItem('ub-media-origin', urlOrigin);
   backend = new RemoteBackend(origin, token);
 } else {
   backend = new LocalBackend();

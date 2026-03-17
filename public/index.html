@@ -25,18 +25,20 @@
 <div class="settings-panel" id="settingsPanel" hidden>
   <div class="settings-inner">
     <div class="section-header">Remote Settings</div>
-    <div class="settings-field">
-      <label for="cfWorkerOrigin">Worker origin</label>
-      <input type="text" id="cfWorkerOrigin" placeholder="https://your-worker.workers.dev" spellcheck="false">
-    </div>
-    <div class="settings-field">
-      <label for="cfToken">GitHub PAT <span class="settings-hint">(actions:write scope)</span></label>
-      <input type="password" id="cfToken" placeholder="ghp_...">
-    </div>
-    <div class="settings-actions">
-      <button class="btn primary" onclick="saveRemoteSettings()">Connect</button>
-      <button class="btn" onclick="clearRemoteSettings()">Disconnect</button>
-    </div>
+    <form id="remoteSettingsForm" onsubmit="return false;">
+      <div class="settings-field">
+        <label for="cfWorkerOrigin">Worker origin</label>
+        <input type="text" id="cfWorkerOrigin" placeholder="https://your-worker.workers.dev" spellcheck="false">
+      </div>
+      <div class="settings-field">
+        <label for="cfToken">GitHub PAT <span class="settings-hint">(actions:write scope)</span></label>
+        <input type="password" id="cfToken" placeholder="ghp_..." autocomplete="off">
+      </div>
+      <div class="settings-actions">
+        <button type="button" class="btn primary" onclick="saveRemoteSettings()">Connect</button>
+        <button type="button" class="btn" onclick="clearRemoteSettings()">Disconnect</button>
+      </div>
+    </form>
   </div>
 </div>
 

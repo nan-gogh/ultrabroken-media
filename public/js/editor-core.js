@@ -121,8 +121,18 @@ function addLocalFiles(fileList) {
   }
   if (!files.length) return;
 
-  // Queue imports sequentially so FFmpeg processes one file at a time.
-  importQueue = importQueue.then(() => importFiles(files));
+  // TODO: re-enable compression once export itself is verified working.
+  // For now, add raw files directly so we can debug the export pipeline.
+  for (const file of files) {
+    localLibrary.push({
+      key: file.name,
+      name: file.name,
+      size: file.size,
+      duration: 0,
+      _file: file,
+    });
+  }
+  renderLocalLibrary();
 }
 
 async function importFiles(files) {

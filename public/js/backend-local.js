@@ -30,6 +30,10 @@ const UTIL_ESM   = `${UNPKG}/@ffmpeg/util@${UTIL_VERSION}/dist/esm/index.js`;
 const CORE_BASE    = `${UNPKG}/@ffmpeg/core@${CORE_VERSION}/dist/esm`;
 const CORE_MT_BASE = `${UNPKG}/@ffmpeg/core-mt@${CORE_VERSION}/dist/esm`;
 
+// The FFmpeg class itself spawns a Web Worker — under COEP (crossOriginIsolated)
+// a cross-origin Worker URL is blocked.  Convert it to a same-origin blob URL.
+const CLASS_WORKER = `${UNPKG}/@ffmpeg/ffmpeg@${FFMPEG_VERSION}/dist/esm/worker.js`;
+
 // ─── Lazy module cache ───────────────────────────────────────────────────────
 
 let _ffmpegMod = null;
@@ -90,9 +94,14 @@ export class LocalBackend {
       });
     }
 
+    // The FFmpeg class worker must be a blob URL too, otherwise
+    // new Worker(unpkg_url) is blocked by COEP.
+    const classWorkerURL = await toBlobURL(CLASS_WORKER, 'text/javascript');
+
     if (crossOriginIsolated) {
       // Multi-threaded core — requires SharedArrayBuffer (needs COOP+COEP).
       await this.ffmpeg.load({
+        classWorkerURL,
         coreURL:   await toBlobURL(`${CORE_MT_BASE}/ffmpeg-core.js`,        'text/javascript'),
         wasmURL:   await toBlobURL(`${CORE_MT_BASE}/ffmpeg-core.wasm`,      'application/wasm'),
         workerURL: await toBlobURL(`${CORE_MT_BASE}/ffmpeg-core.worker.js`, 'text/javascript'),
@@ -101,6 +110,7 @@ export class LocalBackend {
       // Single-threaded core — works without COOP/COEP but is significantly
       // slower; the progress bar is still updated via the progress event.
       await this.ffmpeg.load({
+        classWorkerURL,
         coreURL: await toBlobURL(`${CORE_BASE}/ffmpeg-core.js`,   'text/javascript'),
         wasmURL: await toBlobURL(`${CORE_BASE}/ffmpeg-core.wasm`, 'application/wasm'),
       });

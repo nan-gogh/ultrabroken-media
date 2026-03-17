@@ -38,7 +38,7 @@ if (!location.pathname.startsWith('/manage/editor')) {
 
 <div class="section" id="localPickerSection">
   <div class="section-header">
-    <span>Add Clips</span>
+    <span>Add Footage</span>
   </div>
   <div class="upload-zone" id="dropzone">
     <p><strong>Drop video files here</strong> or click to browse</p>
@@ -47,13 +47,13 @@ if (!location.pathname.startsWith('/manage/editor')) {
   </div>
 </div>
 
-<div class="section" id="remoteLibrarySection" hidden>
+<div class="section" id="librarySection">
   <div class="section-header">
-    <span>Video Library</span>
-    <button class="btn" onclick="loadLibrary()" title="Refresh">↺</button>
+    <span id="libraryTitle">Video Library</span>
+    <button class="btn" id="libraryRefresh" onclick="loadLibrary()" title="Refresh">↺</button>
   </div>
   <div class="library-list" id="libraryList">
-    <div style="padding:20px;text-align:center;color:var(--text-dim);font-size:0.82rem;">Loading…</div>
+    <div style="padding:20px;text-align:center;color:var(--text-dim);font-size:0.82rem;">Drop files above to add footage</div>
   </div>
 </div>
 

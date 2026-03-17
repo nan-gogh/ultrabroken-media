@@ -30,6 +30,10 @@ let nextOverlayId = 1;
 
 let cancelRequested = false;
 
+// Local library: files the user has dropped/picked, shown in the library list
+// before being added to the timeline via the + button.
+let localLibrary = [];  // { key, name, size, _file }
+
 // ── Init ───────────────────────────────────────────────────────────────────
 
 export function initEditor(b) {
@@ -52,9 +56,11 @@ function applyModeUI() {
   label.textContent = isRemote ? 'remote' : 'local';
   label.classList.toggle('remote', isRemote);
 
-  // Source sections
+  // Source sections — local mode shows dropzone + library; remote shows library only
   document.getElementById('localPickerSection').hidden = isRemote;
-  document.getElementById('remoteLibrarySection').hidden = !isRemote;
+  document.getElementById('librarySection').hidden = false;
+  document.getElementById('libraryRefresh').hidden = !isRemote;
+  document.getElementById('libraryTitle').textContent = isRemote ? 'Video Library' : 'Footage';
 
   // Export button label
   document.getElementById('exportBtn').textContent = isRemote
@@ -105,11 +111,47 @@ function wireLocalPicker() {
 }
 
 function addLocalFiles(fileList) {
+  let added = 0;
   for (const file of fileList) {
     if (!file.type.startsWith('video/')) continue;
-    addClip({ key: file.name, name: file.name, _file: file, _local: true });
+    if (localLibrary.some(f => f.key === file.name)) continue;
+    localLibrary.push({ key: file.name, name: file.name, size: file.size, _file: file });
+    added++;
   }
+  if (added) renderLocalLibrary();
 }
+
+function renderLocalLibrary() {
+  const container = document.getElementById('libraryList');
+  if (!localLibrary.length) {
+    container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-dim);font-size:0.82rem;">Drop files above to add footage</div>';
+    return;
+  }
+  let html = '';
+  for (const f of localLibrary) {
+    const name = escHtml(f.name);
+    const size = formatSize(f.size);
+    html += `<div class="library-row">`
+      + `<span class="name" onclick="previewLocalFile(${JSON.stringify(f.key)})" title="Click to preview">${name}</span>`
+      + `<span class="size">${size}</span>`
+      + `<button class="btn" onclick="addLocalClip(${JSON.stringify(f.key)})">+</button>`
+      + `</div>`;
+  }
+  container.innerHTML = html;
+}
+
+window.previewLocalFile = function(key) {
+  const f = localLibrary.find(x => x.key === key);
+  if (!f) return;
+  const url = URL.createObjectURL(f._file);
+  previewUrl(url, key, 0);
+};
+
+window.addLocalClip = function(key) {
+  const f = localLibrary.find(x => x.key === key);
+  if (!f) return;
+  addClip({ key: f.key, name: f.name, _file: f._file, _local: true });
+};
 
 // ── Remote library ─────────────────────────────────────────────────────────
 

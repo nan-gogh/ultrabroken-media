@@ -321,6 +321,13 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 #processingSection.idle #cancelBtn { display: none; }
 #processingSection.idle #processingStep { opacity: 0.45; }
 #processingStep.err { color: var(--danger); opacity: 1 !important; }
+#processingSection .section-header { flex-wrap: wrap; }
+#processingStep {
+  flex: 1 1 auto; min-width: 0; word-break: break-all;
+}
+#processingSection .section-header > span:last-child {
+  margin-left: 0 !important;
+}
 
 /* ── Settings panel ── */
 .settings-panel {

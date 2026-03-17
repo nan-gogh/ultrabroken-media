@@ -101,12 +101,8 @@ export class LocalBackend {
       const coreURL   = await toBlobURL(`${CORE_MT_BASE}/ffmpeg-core.js`,        'text/javascript');
       const wasmURL   = await toBlobURL(`${CORE_MT_BASE}/ffmpeg-core.wasm`,      'application/wasm');
       const workerURL = await toBlobURL(`${CORE_MT_BASE}/ffmpeg-core.worker.js`, 'text/javascript');
-      // Pre-allocate a pthread pool large enough for libx264's thread usage.
-      // Without this, pthread_create() needs to spawn workers dynamically from
-      // inside the blocked class-worker event loop → deadlock at 0%.
-      const poolSize = (self.navigator?.hardwareConcurrency ?? 4) + 6;
       this.onLog?.('Loading multi-threaded core…');
-      await this.ffmpeg.load({ classWorkerURL, coreURL, wasmURL, workerURL, coreOptions: { PTHREAD_POOL_SIZE: poolSize } });
+      await this.ffmpeg.load({ classWorkerURL, coreURL, wasmURL, workerURL });
     } else {
       const coreURL = await toBlobURL(`${CORE_BASE}/ffmpeg-core.js`,   'text/javascript');
       const wasmURL = await toBlobURL(`${CORE_BASE}/ffmpeg-core.wasm`, 'application/wasm');
@@ -276,7 +272,7 @@ export class LocalBackend {
       await this._exec([
         '-i', inName,
         '-c:v', 'libx264', '-crf', '30', '-preset', 'medium',
-        '-x264-params', 'threads=1:lookahead_threads=1',
+        '-x264-params', 'threads=1:lookahead_threads=0',
         '-vf', "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease",
         '-r', '24',
         '-c:a', 'aac', '-b:a', '64k',

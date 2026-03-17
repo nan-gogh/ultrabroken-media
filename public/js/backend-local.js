@@ -262,6 +262,7 @@ export class LocalBackend {
         '-i', inName,
         '-c:v', 'libx264', '-crf', '30', '-preset', 'medium',
         '-vf', "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease",
+        '-r', '24',
         '-c:a', 'aac', '-b:a', '64k',
         '-movflags', '+faststart',
         '-y', outName,

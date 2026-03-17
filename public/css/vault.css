@@ -75,7 +75,7 @@ h1 .sub {
 button.btn, a.btn {
   padding: 4px 11px; border-radius: 4px; border: 1px solid var(--border);
   background: var(--surface2); color: var(--text-dim); cursor: pointer;
-  font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
+  font-family: 'JetBrains Mono', monospace, sans-serif; font-size: 0.75rem;
   transition: color 0.15s, border-color 0.15s;
   text-decoration: none; display: inline-block; line-height: 1.4;
 }

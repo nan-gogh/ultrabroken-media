@@ -325,8 +325,8 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 #processingStep {
   flex: 1 1 auto; min-width: 0; word-break: break-all;
 }
-#processingSection .section-header > span:last-child {
-  margin-left: 0 !important;
+.processing-controls {
+  display: flex; align-items: center; gap: 8px;
 }
 
 /* ── Settings panel ── */

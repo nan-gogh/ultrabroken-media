@@ -354,7 +354,7 @@ export function renderTimeline() {
   tl.innerHTML = html;
   document.getElementById('clipCount').textContent = clips.length > 0 ? clips.length + ' clip(s)' : '';
   const totalDur = getTotalDuration();
-  document.getElementById('timelineTotal').textContent = totalDur > 0 ? fmtTime(totalDur) : '';
+  document.getElementById('timelineTotal').textContent = totalDur > 0 ? 'Total: ' + fmtTime(totalDur) : '';
   renderOverlayTotal();
 }
 
@@ -397,9 +397,9 @@ export function renderEditor() {
     + `<span class="editor-name" title="${escHtml(c.key)}">${escHtml(c.name)}</span>`
     + `</div>`
     + `<div class="editor-times">`
-    + `<input type="number" inputmode="decimal" min="0" step="0.1" value="${c.start.toFixed(1)}" onchange="onNumIn(0,this.value)" title="Start">`
+    + `<input type="number" lang="en" inputmode="decimal" min="0" step="0.1" value="${c.start.toFixed(1)}" onchange="onNumIn(0,this.value)" title="Start">`
     + `<span>&rarr;</span>`
-    + `<input type="number" inputmode="decimal" min="0" step="0.1" value="${endVal.toFixed(1)}" onchange="onNumIn(1,this.value)" title="End">`
+    + `<input type="number" lang="en" inputmode="decimal" min="0" step="0.1" value="${endVal.toFixed(1)}" onchange="onNumIn(1,this.value)" title="End">`
     + `</div>`
     + `<div class="editor-range">`
     + `<div class="range-fill" style="left:calc(${c.start / maxVal} * (100% - 24px) + 12px);right:calc(${1 - endVal / maxVal} * (100% - 24px) + 12px);"></div>`
@@ -458,10 +458,10 @@ function patchEditor(c, maxVal) {
     fill.style.right = `calc(${1 - endVal / maxVal} * (100% - 24px) + 12px)`;
   }
   const times = panel.querySelectorAll('.editor-times input[type="number"]');
-  if (times[0]) times[0].value = c.start;
+  if (times[0]) times[0].value = c.start.toFixed(1);
   if (times[1]) times[1].value = endVal.toFixed(1);
   const using = panel.querySelector('.using-label');
-  if (using) using.textContent = 'Using ' + (c.duration > 0 ? (endVal - c.start).toFixed(1) + 's' : '?');
+  if (using) using.textContent = 'Using ' + (c.duration > 0 ? (endVal - c.start).toFixed(1) + ' of ' + c.duration.toFixed(1) + ' seconds' : '?');
 }
 
 // ── Text overlays ──────────────────────────────────────────────────────────
@@ -480,9 +480,9 @@ function renderOverlays() {
       + `<input type="text" value="${escHtml(ov.text)}" placeholder="Text…" oninput="onOverlayChange(${i},'text',this.value)">`
       + `<div class="ov-controls">`
       + `<span class="ov-label">from</span>`
-      + `<input type="number" inputmode="decimal" min="0" step="0.1" value="${ov.start.toFixed(1)}" onchange="onOverlayChange(${i},'start',this.value)">`
+      + `<input type="number" lang="en" inputmode="decimal" min="0" step="0.1" value="${ov.start.toFixed(1)}" onchange="onOverlayChange(${i},'start',this.value)">`
       + `<span class="ov-label">to</span>`
-      + `<input type="number" inputmode="decimal" min="0" step="0.1" value="${ov.end.toFixed(1)}" onchange="onOverlayChange(${i},'end',this.value)">`
+      + `<input type="number" lang="en" inputmode="decimal" min="0" step="0.1" value="${ov.end.toFixed(1)}" onchange="onOverlayChange(${i},'end',this.value)">`
       + `<button class="btn danger" onclick="removeOverlay(${i})">&times;</button>`
       + `</div>`
       + `</div>`;

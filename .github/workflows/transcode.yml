@@ -58,7 +58,7 @@ jobs:
           IFS=',' read -ra KEYS <<< "${{ inputs.keys }}"
           CRF="${{ inputs.quality }}"
           # Validate CRF is an integer 24-30
-          if ! echo "$CRF" | grep -qE '^(2[4-9]|30)$'; then CRF=24; fi
+          if ! echo "$CRF" | grep -qE '^(1[89]|2[0-9]|30)$'; then CRF=24; fi
 
           for key in "${KEYS[@]}"; do
             key=$(echo "$key" | xargs)  # trim whitespace

@@ -179,17 +179,17 @@ function renderLocalLibrary() {
     const compressBtn = f.compressed
       ? `<button class="btn compress-btn done" onclick="uncompressLibraryFile(${ak})" title="Undo compression — restore original (${formatSize(f._sizeOriginal || f.size)})">&circlearrowleft;</button>`
       : `<button class="btn compress-btn" onclick="compressLibraryFile(${ak})" title="Compress to H.264 720p">⚙</button>`;
-    const slider = f.compressed ? '' : `<input type="range" class="quality-slider" min="24" max="30" value="24" data-key="${escHtml(f.key)}" title="Quality: CRF 24 (high) – 30 (small)">`;
+    const slider = f.compressed ? '' : `<span class="compress-label">Compression</span><input type="range" class="quality-slider" min="18" max="30" value="24" data-key="${escHtml(f.key)}" title="CRF 18 (high quality) – 30 (small file)">`;
     html += `<div class="library-row">`
-      + `<div class="lib-top">`
+      + `<div class="lib-main">`
       + `<span class="name" onclick="previewLocalFile(${ak})" title="Click to preview">${name}</span>`
-      + `<button class="btn" onclick="addLocalClip(${ak})">+</button>`
-      + `</div>`
-      + `<div class="lib-bottom">`
+      + `<span class="lib-compress">`
       + `<span class="size">${size}</span>`
       + slider
       + compressBtn
+      + `</span>`
       + `</div>`
+      + `<button class="btn lib-add" onclick="addLocalClip(${ak})">+</button>`
       + `</div>`;
   }
   container.innerHTML = html;

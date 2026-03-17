@@ -630,10 +630,9 @@ const MANAGE_HTML = `<!DOCTYPE html>
     margin-top: 12px; font-size: 0.78rem; color: var(--text-dim);
   }
   .quality-row label { font-weight: 600; color: var(--text); }
-  .quality-row .q-label { font-size: 0.72rem; }
   .quality-row input[type="range"] {
-    -webkit-appearance: none; appearance: none; width: 120px; height: 4px;
-    background: var(--border); border-radius: 2px; outline: none; cursor: pointer;
+    -webkit-appearance: none; appearance: none; width: 120px; height: 14px;
+    background: var(--border); border-radius: 7px; outline: none; cursor: pointer;
   }
   .quality-row input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
@@ -644,7 +643,7 @@ const MANAGE_HTML = `<!DOCTYPE html>
     background: var(--accent); border: none; cursor: pointer;
   }
   .quality-row input[type="range"]::-moz-range-track {
-    height: 4px; background: var(--border); border-radius: 2px; border: none;
+    height: 14px; background: var(--border); border-radius: 7px; border: none;
   }
   /* Prefix selector */
 
@@ -738,10 +737,8 @@ const MANAGE_HTML = `<!DOCTYPE html>
   <p><strong>Drop files here</strong> or click to browse</p>
   <p style="margin-top:6px;font-size:0.78rem;color:var(--text-dim);">Videos &rarr; <code>video/</code> (H.264 transcode) &nbsp;&bull;&nbsp; Images &rarr; <code>image/</code> (AVIF optimize)</p>
   <div class="quality-row" onclick="event.stopPropagation()">
-    <label>Quality</label>
-    <span class="q-label">High</span>
-    <input type="range" id="qualitySlider" min="24" max="30" value="24">
-    <span class="q-label">Small</span>
+    <label>Compression</label>
+    <input type="range" id="qualitySlider" min="18" max="30" value="24">
   </div>
   <input type="file" id="fileInput" multiple hidden>
 </div>

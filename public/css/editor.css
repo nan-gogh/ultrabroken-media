@@ -93,29 +93,37 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 /* ── Remote library ── */
 .library-list { max-height: 220px; overflow-y: auto; }
 .library-row {
-  display: flex; flex-direction: column; padding: 7px 16px; gap: 4px;
+  display: flex; align-items: flex-start; padding: 7px 16px; gap: 10px;
   border-bottom: 1px solid var(--border); font-size: 0.78rem;
 }
 .library-row:last-child { border-bottom: none; }
 .library-row:hover { background: var(--surface2); }
-.lib-top {
-  display: flex; align-items: center; gap: 10px;
+.lib-main {
+  flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap;
+  align-items: center; gap: 6px;
 }
 .library-row .name {
-  flex: 1 1 auto; min-width: 0; font-family: 'JetBrains Mono', monospace;
-  overflow-wrap: break-word; cursor: pointer;
+  flex: 1 1 100%; min-width: 0; font-family: 'JetBrains Mono', monospace;
+  overflow-wrap: break-word; word-break: break-all; cursor: pointer;
+}
+@media (min-width: 500px) {
+  .library-row .name { flex: 1 1 auto; }
 }
 .library-row .name:hover { color: var(--accent); }
-.lib-bottom {
+.lib-compress {
   display: flex; align-items: center; gap: 6px;
+}
+.compress-label {
+  color: var(--text-dim); font-size: 0.68rem; white-space: nowrap;
 }
 .library-row .size {
   color: var(--text-dim); font-family: 'JetBrains Mono', monospace;
   font-size: 0.72rem; white-space: nowrap;
 }
+.lib-add { flex-shrink: 0; }
 .quality-slider {
   -webkit-appearance: none; appearance: none; flex: 1 1 auto;
-  height: 4px; background: var(--border); border-radius: 2px;
+  height: 14px; background: var(--border); border-radius: 7px;
   outline: none; cursor: pointer; min-width: 50px; max-width: 120px;
 }
 .quality-slider::-webkit-slider-thumb {
@@ -127,7 +135,7 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
   background: var(--accent); border: none; cursor: pointer;
 }
 .quality-slider::-moz-range-track {
-  height: 4px; background: var(--border); border-radius: 2px; border: none;
+  height: 14px; background: var(--border); border-radius: 7px; border: none;
 }
 .library-row .compress-btn {
   opacity: 0.7;

@@ -18,8 +18,12 @@ const params = new URLSearchParams(location.search);
 const forceMode = params.get('mode');
 const urlOrigin = params.get('origin');  // From Worker redirect
 
-// Debug: log what we read from URL params
-console.log('[app.js] URL params:', { forceMode, urlOrigin, href: location.href });
+// Debug: log what we read from URL params and full URL
+console.log('[app.js] Full href:', location.href);
+console.log('[app.js] Search string:', location.search);
+console.log('[app.js] forceMode:', forceMode);
+console.log('[app.js] urlOrigin:', urlOrigin);
+console.log('[app.js] All params:', Array.from(params.entries()));
 
 let backend;
 
@@ -28,7 +32,7 @@ if (forceMode === 'remote' || (!forceMode && localStorage.getItem('ub-media-toke
   const origin = urlOrigin || localStorage.getItem('ub-media-origin') || '';
   const token  = localStorage.getItem('ub-media-token')  || '';
   
-  console.log('[app.js] Remote mode detected:', { origin, hasToken: !!token });
+  console.log('[app.js] Remote mode - resolved origin:', origin, 'token exists:', !!token);
   
   // Warn if origin is empty
   if (!origin) {

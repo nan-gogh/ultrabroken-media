@@ -35,7 +35,7 @@ const CORE_MT_BASE = `${UNPKG}/@ffmpeg/core-mt@${CORE_VERSION}/dist/esm`;
 // ./errors.js) fail silently because blob: has an opaque origin — and
 // import(blobCoreURL) inside a blob-origin module worker never resolves
 // in some browsers.  Serving from the same origin avoids all of this.
-const CLASS_WORKER_PATH = 'js/vendor/ffmpeg-worker.js';
+const CLASS_WORKER_PATH = '../js/vendor/ffmpeg-worker.js';
 
 // ─── Lazy module cache ───────────────────────────────────────────────────────
 
@@ -137,7 +137,7 @@ export class LocalBackend {
     // Pre-load font for drawtext overlays (FFmpeg.wasm has no system fonts).
     const hasOverlays = job.overlays && job.overlays.length > 0;
     if (hasOverlays && !this._fontData) {
-      const fontUrl = new URL('js/vendor/font.ttf', location.href).href;
+      const fontUrl = new URL('../js/vendor/font.ttf', location.href).href;
       this._fontData = await fetchFile(fontUrl);
     }
 

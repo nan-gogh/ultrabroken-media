@@ -613,7 +613,8 @@ const MANAGE_HTML = `<!DOCTYPE html>
   <p style="margin-top:6px;font-size:0.78rem;color:var(--text-dim);">Videos &rarr; <code>video/</code> (H.264 transcode) &nbsp;&bull;&nbsp; Images &rarr; <code>image/</code> (AVIF optimize)</p>
   <div class="quality-row" onclick="event.stopPropagation()">
     <label>Compression</label>
-    <input type="range" id="qualitySlider" min="18" max="30" value="24">
+    <input type="range" id="qualitySlider" min="18" max="30" value="24" oninput="document.getElementById('qualityValue').textContent=this.value">
+    <span id="qualityValue" style="color:var(--text-dim);font-size:0.68rem;min-width:1.4em;text-align:right">24</span>
   </div>
   <input type="file" id="fileInput" multiple hidden>
 </div>

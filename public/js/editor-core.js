@@ -65,8 +65,8 @@ function applyModeUI() {
   // Library section — always visible; dropzone only in local mode
   document.getElementById('librarySection').hidden = false;
   document.getElementById('libraryRefresh').style.display = isRemote ? '' : 'none';
-  document.getElementById('libraryTitle').textContent = isRemote ? 'Video Library' : 'Footage';
-  document.getElementById('localCompressControl').hidden = true;
+  document.getElementById('libraryTitle').textContent = 'Video Library';
+  document.getElementById('localCompressControl').hidden = isRemote;
   document.getElementById('dropzone').hidden = isRemote;
 
   // Export bar: hide the "video/" prefix in local mode
@@ -172,8 +172,6 @@ function renderLocalLibrary() {
     container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-dim);font-size:0.82rem;">Drop files below to add footage</div>';
     return;
   }
-  const compressControl = document.getElementById('localCompressControl');
-  if (compressControl) compressControl.hidden = backend.mode === 'remote' || !localLibrary.some(f => !f.compressed);
   let html = '';
   for (const f of localLibrary) {
     const name = escHtml(f.name);

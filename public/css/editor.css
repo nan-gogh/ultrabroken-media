@@ -100,6 +100,9 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 .compress-label {
   color: var(--text-dim); font-size: 0.68rem; white-space: nowrap;
 }
+.compress-value {
+  color: var(--text-dim); font-size: 0.68rem; min-width: 1.4em; text-align: right;
+}
 .quality-slider {
   -webkit-appearance: none; appearance: none;
   height: 14px; background: var(--border); border-radius: 7px;

@@ -175,15 +175,20 @@ function renderLocalLibrary() {
   for (const f of localLibrary) {
     const name = escHtml(f.name);
     const size = formatSize(f.size);
+    const ak = attrJson(f.key);
     const compressBtn = f.compressed
-      ? `<button class="btn compress-btn done" onclick="uncompressLibraryFile(${attrJson(f.key)})" title="Undo compression \u2014 restore original (${formatSize(f._sizeOriginal || f.size)})">&circlearrowleft;</button>`
-      : `<button class="btn compress-btn" onclick="compressLibraryFile(${attrJson(f.key)})" title="Compress to H.264 720p">\u2699</button>`;
+      ? `<button class="btn compress-btn done" onclick="uncompressLibraryFile(${ak})" title="Undo compression — restore original (${formatSize(f._sizeOriginal || f.size)})">&circlearrowleft;</button>`
+      : `<button class="btn compress-btn" onclick="compressLibraryFile(${ak})" title="Compress to H.264 720p">⚙</button>`;
+    const slider = f.compressed ? '' : `<input type="range" class="quality-slider" min="24" max="30" value="24" data-key="${escHtml(f.key)}" title="Quality: CRF 24 (high) – 30 (small)">`;
     html += `<div class="library-row">`
-      + `<span class="name" onclick="previewLocalFile(${attrJson(f.key)})" title="Click to preview">${name}</span>`
-      + `<div class="lib-controls">`
+      + `<div class="lib-top">`
+      + `<span class="name" onclick="previewLocalFile(${ak})" title="Click to preview">${name}</span>`
+      + `<button class="btn" onclick="addLocalClip(${ak})">+</button>`
+      + `</div>`
+      + `<div class="lib-bottom">`
       + `<span class="size">${size}</span>`
+      + slider
       + compressBtn
-      + `<button class="btn" onclick="addLocalClip(${attrJson(f.key)})">+</button>`
       + `</div>`
       + `</div>`;
   }
@@ -206,15 +211,17 @@ window.addLocalClip = function(key) {
 window.compressLibraryFile = async function(key) {
   const f = localLibrary.find(x => x.key === key);
   if (!f || f.compressed) return;
+  const sliderEl = document.querySelector('.quality-slider[data-key="' + CSS.escape(key) + '"]');
+  const crf = sliderEl ? parseInt(sliderEl.value, 10) : 24;
   clearLog();
   appendLog('Compressing ' + f.name + '…');
   setProgress(true, 0);
-  document.getElementById('processingStep').textContent = 'Compressing ' + f.name + '\u2026';
+  document.getElementById('processingStep').textContent = 'Compressing ' + f.name + '…';
   try {
     const originalSize = f.size;
     const { blob, duration } = await backend.importFile(f._file, ratio => {
       setProgress(true, ratio);
-    });
+    }, crf);
     if (blob.size >= originalSize) {
       setProgress(true, 1, true);
       showStatus(f.name + ' \u2014 already optimized, kept original (' + formatSize(originalSize) + ')', true);

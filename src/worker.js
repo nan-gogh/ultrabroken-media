@@ -177,6 +177,7 @@ async function handleUpload(request, env) {
   const formData = await request.formData();
   const prefix = formData.get("prefix") || "";
   const skipWorkflow = formData.get("skipWorkflow") === "true";
+  const quality = formData.get("quality") || "24";
   const results = [];
 
   for (const [fieldName, value] of formData.entries()) {
@@ -222,7 +223,7 @@ async function handleUpload(request, env) {
           'Content-Type': 'application/json',
           'User-Agent': 'ultrabroken-media-worker',
         },
-        body: JSON.stringify({ ref: 'main', inputs: { keys: videoKeys.join(',') } }),
+        body: JSON.stringify({ ref: 'main', inputs: { keys: videoKeys.join(','), quality } }),
       });
       dispatches.push({ workflow: 'transcode', status: resp.status, ok: resp.status === 204 });
     } catch (e) {
@@ -624,6 +625,27 @@ const MANAGE_HTML = `<!DOCTYPE html>
   }
   .upload-zone p { color: var(--text-dim); font-size: 0.9rem; }
   .upload-zone p strong { color: var(--accent); }
+  .quality-row {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    margin-top: 12px; font-size: 0.78rem; color: var(--text-dim);
+  }
+  .quality-row label { font-weight: 600; color: var(--text); }
+  .quality-row .q-label { font-size: 0.72rem; }
+  .quality-row input[type="range"] {
+    -webkit-appearance: none; appearance: none; width: 120px; height: 4px;
+    background: var(--border); border-radius: 2px; outline: none; cursor: pointer;
+  }
+  .quality-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+    background: var(--accent); border: none; cursor: pointer;
+  }
+  .quality-row input[type="range"]::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--accent); border: none; cursor: pointer;
+  }
+  .quality-row input[type="range"]::-moz-range-track {
+    height: 4px; background: var(--border); border-radius: 2px; border: none;
+  }
   /* Prefix selector */
 
   /* File list */
@@ -715,6 +737,12 @@ const MANAGE_HTML = `<!DOCTYPE html>
 <div class="upload-zone" id="dropzone">
   <p><strong>Drop files here</strong> or click to browse</p>
   <p style="margin-top:6px;font-size:0.78rem;color:var(--text-dim);">Videos &rarr; <code>video/</code> (H.264 transcode) &nbsp;&bull;&nbsp; Images &rarr; <code>image/</code> (AVIF optimize)</p>
+  <div class="quality-row" onclick="event.stopPropagation()">
+    <label>Quality</label>
+    <span class="q-label">High</span>
+    <input type="range" id="qualitySlider" min="24" max="30" value="24">
+    <span class="q-label">Small</span>
+  </div>
   <input type="file" id="fileInput" multiple hidden>
 </div>
 
@@ -842,9 +870,12 @@ async function uploadFiles(rawFiles) {
   const images = files.filter(f => f.type.startsWith('image/'));
   const uploads = [];
 
+  const quality = document.getElementById("qualitySlider").value;
+
   if (videos.length) {
     const form = new FormData();
     form.set("prefix", "video/");
+    form.set("quality", quality);
     for (const f of videos) form.append("file", f);
     uploads.push(fetch(API + "/upload", { method: "POST", body: form }).then(r => r.json()));
   }

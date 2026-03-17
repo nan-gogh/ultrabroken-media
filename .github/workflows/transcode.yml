@@ -7,6 +7,11 @@ on:
         description: 'Comma-separated R2 keys to transcode (e.g., video/clip.mp4,video/demo.mov)'
         required: true
         type: string
+      quality:
+        description: 'CRF value (24=high quality, 30=small file)'
+        required: false
+        default: '24'
+        type: string
 
 concurrency:
   group: transcode
@@ -51,6 +56,9 @@ jobs:
           set -euo pipefail
 
           IFS=',' read -ra KEYS <<< "${{ inputs.keys }}"
+          CRF="${{ inputs.quality }}"
+          # Validate CRF is an integer 24-30
+          if ! echo "$CRF" | grep -qE '^(2[4-9]|30)$'; then CRF=24; fi
 
           for key in "${KEYS[@]}"; do
             key=$(echo "$key" | xargs)  # trim whitespace
@@ -67,9 +75,9 @@ jobs:
             original_size=$(stat -c%s "input.$ext_lower")
             echo "Original: $(numfmt --to=iec $original_size)"
 
-            # Transcode: H.264+AAC, max 720p24, CRF 24
+            # Transcode: H.264+AAC, max 720p24, CRF from quality input
             ffmpeg -i "input.$ext_lower" \
-              -c:v libx264 -crf 24 -preset slow \
+              -c:v libx264 -crf "$CRF" -preset slow \
               -vf "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease" \
               -r 24 \
               -c:a aac -b:a 64k \

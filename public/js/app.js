@@ -18,16 +18,30 @@ const params = new URLSearchParams(location.search);
 const forceMode = params.get('mode');
 const urlOrigin = params.get('origin');  // From Worker redirect
 
+// Debug: log what we read from URL params
+console.log('[app.js] URL params:', { forceMode, urlOrigin, href: location.href });
+
 let backend;
 
 if (forceMode === 'remote' || (!forceMode && localStorage.getItem('ub-media-token'))) {
   // Priority: URL param (from Worker redirect) > localStorage > empty
   const origin = urlOrigin || localStorage.getItem('ub-media-origin') || '';
   const token  = localStorage.getItem('ub-media-token')  || '';
+  
+  console.log('[app.js] Remote mode detected:', { origin, hasToken: !!token });
+  
+  // Warn if origin is empty
+  if (!origin) {
+    const msg = 'Worker origin not set. Please enter it in Settings or visit via /manage/editor redirect.';
+    console.warn('[app.js]', msg);
+    document.body.innerHTML += `<div style="padding: 20px; color: #f85149; font-family: monospace;"><strong>⚠ ${msg}</strong></div>`;
+  }
+  
   // If we got origin from URL param, save it to localStorage for next time
   if (urlOrigin) localStorage.setItem('ub-media-origin', urlOrigin);
   backend = new RemoteBackend(origin, token);
 } else {
+  console.log('[app.js] Local mode');
   backend = new LocalBackend();
 }
 

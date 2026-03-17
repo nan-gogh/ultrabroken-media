@@ -64,7 +64,7 @@ function applyModeUI() {
 
   // Library section — always visible; dropzone only in local mode
   document.getElementById('librarySection').hidden = false;
-  document.getElementById('libraryRefresh').hidden = !isRemote;
+  document.getElementById('libraryRefresh').style.display = isRemote ? '' : 'none';
   document.getElementById('libraryTitle').textContent = isRemote ? 'Video Library' : 'Footage';
   document.getElementById('dropzone').hidden = isRemote;
 

@@ -9,12 +9,22 @@
 <link href="https://fonts.googleapis.com/css2?family=New+Rocker&family=Texturina:ital,opsz,wght@0,12..44,100..900;1,12..44,100..900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/editor.css">
 <!-- COI service worker: only needed in local mode for FFmpeg.wasm SharedArrayBuffer.
-     Remote mode runs entirely server-side, so skip the SW (avoids a first-visit reload). -->
+     Remote mode runs entirely server-side, so skip the SW (avoids a first-visit reload).
+     Register with a literal path — dynamic script injection makes document.currentScript
+     null on desktop browsers, causing the fallback path lookup to fail silently. -->
 <script>
 if (!location.pathname.startsWith('/manage/editor')) {
-  var s = document.createElement('script');
-  s.src = 'coi-serviceworker.js';
-  document.head.appendChild(s);
+  if ('serviceWorker' in navigator && !crossOriginIsolated) {
+    navigator.serviceWorker.register('coi-serviceworker.js').then(function(reg) {
+      if (reg.installing) {
+        reg.installing.addEventListener('statechange', function() {
+          if (this.state === 'activated') location.reload();
+        });
+      }
+    }).catch(function(err) {
+      console.warn('[coi-sw] Registration failed (single-threaded fallback):', err);
+    });
+  }
 }
 </script>
 </head>

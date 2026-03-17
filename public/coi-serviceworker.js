@@ -50,26 +50,6 @@ if (typeof ServiceWorkerGlobalScope !== 'undefined' && self instanceof ServiceWo
 
 /* ── Page scope ──────────────────────────────────────────────────────────── */
 
-else if (typeof window !== 'undefined') {
-  // Only proceed if SW is supported and we are not already isolated
-  if ('serviceWorker' in navigator && !window.crossOriginIsolated) {
-    const swUrl = document.currentScript
-      ? new URL(document.currentScript.src).pathname
-      : '/js/coi-serviceworker.js';
-
-    navigator.serviceWorker.register(swUrl).then(reg => {
-      // If the SW was just installed (first visit), reload once to activate it.
-      if (reg.installing) {
-        reg.installing.addEventListener('statechange', function() {
-          if (this.state === 'activated') {
-            location.reload();
-          }
-        });
-      }
-    }).catch(err => {
-      // SW registration failure is non-fatal: FFmpeg.wasm will fall back to
-      // single-threaded mode.
-      console.warn('[coi-serviceworker] Registration failed:', err);
-    });
-  }
-}
+// Registration is handled inline in index.html with a known literal path.
+// This file only needs to run as a Service Worker (see ServiceWorkerGlobalScope
+// block above).

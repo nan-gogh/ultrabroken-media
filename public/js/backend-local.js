@@ -172,7 +172,7 @@ export class LocalBackend {
     try {
       // 1. Write font to VFS if needed for text overlays.
       if (hasOverlays) {
-        await this.ffmpeg.writeFile('font.ttf', this._fontData);
+        await this.ffmpeg.writeFile('font.ttf', new Uint8Array(this._fontData));
         writtenFiles.push('font.ttf');
       }
 

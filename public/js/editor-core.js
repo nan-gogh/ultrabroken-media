@@ -272,8 +272,9 @@ function previewUrl(url, key, startTime) {
   const t = startTime || 0;
   const v = document.createElement('video');
   v.controls = true;
+  v.playsInline = true;
   v.preload = 'metadata';
-  v.src = url + '#t=' + t;
+  v.src = t ? url + '#t=' + t : url;
   box.replaceChildren(v);
   box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
@@ -394,9 +395,9 @@ export function renderEditor() {
     + `<span class="editor-name" title="${escHtml(c.key)}">${escHtml(c.name)}</span>`
     + `<span class="editor-dur">${durText}</span></div>`
     + `<div class="editor-times">`
-    + `<input type="number" min="0" step="0.1" value="${c.start}" onchange="onNumIn(0,this.value)" title="Start">`
+    + `<input type="number" inputmode="decimal" min="0" step="0.1" value="${c.start.toFixed(1)}" onchange="onNumIn(0,this.value)" title="Start">`
     + `<span>&rarr;</span>`
-    + `<input type="number" min="0" step="0.1" value="${endVal.toFixed(1)}" onchange="onNumIn(1,this.value)" title="End">`
+    + `<input type="number" inputmode="decimal" min="0" step="0.1" value="${endVal.toFixed(1)}" onchange="onNumIn(1,this.value)" title="End">`
     + `</div>`
     + `<div class="editor-range">`
     + `<div class="range-fill" style="left:calc(${c.start / maxVal} * (100% - 24px) + 12px);right:calc(${1 - endVal / maxVal} * (100% - 24px) + 12px);"></div>`
@@ -477,9 +478,9 @@ function renderOverlays() {
       + `<input type="text" value="${escHtml(ov.text)}" placeholder="Text…" oninput="onOverlayChange(${i},'text',this.value)">`
       + `<div class="ov-controls">`
       + `<span class="ov-label">from</span>`
-      + `<input type="number" min="0" step="0.1" value="${ov.start}" onchange="onOverlayChange(${i},'start',this.value)">`
+      + `<input type="number" inputmode="decimal" min="0" step="0.1" value="${ov.start.toFixed(1)}" onchange="onOverlayChange(${i},'start',this.value)">`
       + `<span class="ov-label">to</span>`
-      + `<input type="number" min="0" step="0.1" value="${ov.end}" onchange="onOverlayChange(${i},'end',this.value)">`
+      + `<input type="number" inputmode="decimal" min="0" step="0.1" value="${ov.end.toFixed(1)}" onchange="onOverlayChange(${i},'end',this.value)">`
       + `<span class="ov-label">s</span>`
       + `<button class="btn danger" onclick="removeOverlay(${i})">&times;</button>`
       + `</div>`

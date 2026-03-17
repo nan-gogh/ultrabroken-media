@@ -93,16 +93,27 @@ export function buildFFmpegArgs(job, opts = {}) {
   let vf = "setpts=PTS-STARTPTS,scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease";
 
   if (job.overlays && job.overlays.length > 0) {
-    for (const ov of job.overlays) {
-      if (!ov.text.trim()) continue;
-      // Escape special characters for ffmpeg drawtext filter
-      const safeText = ov.text.trim()
+    // Merge time-overlapping overlays into single text boxes
+    const valid = job.overlays.filter(ov => ov.text.trim());
+    const sorted = valid.slice().sort((a, b) => a.start - b.start);
+    const groups = [];
+    for (const ov of sorted) {
+      const last = groups[groups.length - 1];
+      if (last && ov.start < last.end) {
+        last.texts.push(ov.text.trim());
+        last.end = Math.max(last.end, ov.end);
+      } else {
+        groups.push({ start: ov.start, end: ov.end, texts: [ov.text.trim()] });
+      }
+    }
+    for (const g of groups) {
+      const safeText = g.texts.join('\n')
         .replace(/\\/g, '\\\\\\\\')
-        .replace(/'/g, '\u2019')        // typographic apostrophe avoids shell quoting issues
+        .replace(/'/g, '\u2019')
         .replace(/:/g, '\\\\:')
         .replace(/%/g, '%%%%');
       vf += `,drawtext=text='${safeText}'`
-        + `:enable='between(t,${ov.start},${ov.end})'`
+        + `:enable='between(t,${g.start},${g.end})'`
         + `:fontsize=36:fontcolor=white`
         + (opts.fontFile ? `:fontfile=${opts.fontFile}` : '')
         + `:x=(w-tw)/2:y=h-th-40`

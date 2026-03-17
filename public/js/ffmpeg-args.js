@@ -71,7 +71,7 @@ export function buildFFmpegArgs(job, opts = {}) {
     const inputFile = `clip_${i}.mp4`;
     const outputFile = `trimmed_${i}.mkv`;
 
-    const args = [];
+    const args = ['-threads', '1'];
     if (clip.start > 0) {
       args.push('-ss', String(clip.start));
     }
@@ -113,7 +113,9 @@ export function buildFFmpegArgs(job, opts = {}) {
   }
 
   const finalCommand = [
+    '-threads', '1',
     '-f', 'concat', '-safe', '0', '-i', 'concat_list.txt',
+    '-filter_threads', '1',
     '-c:v', 'libx264', '-crf', '30', '-preset', preset,
     '-x264-params', 'threads=1:lookahead_threads=0',
     '-vf', vf,

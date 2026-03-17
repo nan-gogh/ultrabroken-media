@@ -110,15 +110,50 @@ function wireLocalPicker() {
   });
 }
 
+let importQueue = Promise.resolve();
+
 function addLocalFiles(fileList) {
-  let added = 0;
+  const files = [];
   for (const file of fileList) {
     if (!file.type.startsWith('video/')) continue;
     if (localLibrary.some(f => f.key === file.name)) continue;
-    localLibrary.push({ key: file.name, name: file.name, size: file.size, _file: file });
-    added++;
+    files.push(file);
   }
-  if (added) renderLocalLibrary();
+  if (!files.length) return;
+
+  // Queue imports sequentially so FFmpeg processes one file at a time.
+  importQueue = importQueue.then(() => importFiles(files));
+}
+
+async function importFiles(files) {
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const label = files.length > 1
+      ? `Compressing ${i + 1}/${files.length}: ${file.name}`
+      : `Compressing ${file.name}`;
+    showStatus(label + '\u2026', true, 0);
+    setProgress(true, 0);
+
+    try {
+      const { blob, duration } = await backend.importFile(file, ratio => {
+        setProgress(true, ratio);
+      });
+      localLibrary.push({
+        key: file.name,
+        name: file.name,
+        size: blob.size,
+        duration,
+        _file: blob,     // compressed blob replaces the raw File
+      });
+      renderLocalLibrary();
+    } catch (e) {
+      showStatus('Compression failed: ' + file.name + ' \u2014 ' + e.message, false);
+    }
+  }
+  setProgress(false);
+  showStatus(files.length === 1
+    ? 'Ready: ' + files[0].name
+    : files.length + ' files compressed and ready', true);
 }
 
 function renderLocalLibrary() {
@@ -150,7 +185,7 @@ window.previewLocalFile = function(key) {
 window.addLocalClip = function(key) {
   const f = localLibrary.find(x => x.key === key);
   if (!f) return;
-  addClip({ key: f.key, name: f.name, _file: f._file, _local: true });
+  addClip({ key: f.key, name: f.name, _file: f._file, _local: true, duration: f.duration || 0 });
 };
 
 // ── Remote library ─────────────────────────────────────────────────────────
@@ -209,11 +244,18 @@ function previewUrl(url, key, startTime) {
 
 export function addClip(file) {
   const clipId = nextClipId++;
-  clips.push({ id: clipId, key: file.key, name: file.name, start: 0, end: -1, duration: 0, _file: file._file || null, _local: !!file._local });
+  const knownDur = file.duration || 0;
+  clips.push({ id: clipId, key: file.key, name: file.name, start: 0, end: knownDur || -1, duration: knownDur, _file: file._file || null, _local: !!file._local });
   selectedIndex = clips.length - 1;
   renderTimeline();
   renderEditor();
   showStatus('Added: ' + file.name, true, 3000);
+
+  // If duration is already known (local compressed file), skip probing.
+  if (knownDur > 0) {
+    renderOverlayTotal();
+    return;
+  }
 
   const previewUrl_ = backend.getPreviewUrl(file);
   getVideoDuration(previewUrl_).then(dur => {
@@ -578,9 +620,10 @@ async function runLocalExport(job, name) {
   setProgress(true, 0);
   showStatus('Processing…', true, 0);
 
-  const result = await backend.execute(job, (ratio) => {
+  const result = await backend.execute(job, (ratio, step) => {
     if (cancelRequested) throw new Error('cancelled');
     setProgress(true, ratio);
+    if (step) showStatus(step, true, 0);
   });
 
   setProgress(false);

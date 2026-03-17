@@ -66,13 +66,9 @@ export class LocalBackend {
     return [];
   }
 
-  /**
-   * Generate a preview URL for a local File.
-   * @param {{ key: string, _file?: File }} file
-   * @returns {string}
-   */
+  /**\n   * Generate a preview URL for a local File or Blob.\n   * @param {{ key: string, _file?: File|Blob }} file\n   * @returns {string}\n   */
   getPreviewUrl(file) {
-    if (file._file instanceof File) {
+    if (file._file instanceof Blob) {
       return URL.createObjectURL(file._file);
     }
     return '';
@@ -127,7 +123,7 @@ export class LocalBackend {
    * in-browser; the Actions workflow uses 'slow').
    *
    * @param {import('./ffmpeg-args.js').EditJob} job
-   * @param {(ratio: number) => void} [onProgress]  - called with 0..1
+   * @param {(ratio: number, step?: string) => void} [onProgress]  - called with 0..1 and optional step label
    * @returns {Promise<Blob>}  the finished MP4 as a Blob
    */
   async execute(job, onProgress) {
@@ -141,10 +137,18 @@ export class LocalBackend {
     let   stepsDone   = 0;
 
     // Attach progress listener — fired by FFmpeg.wasm during each exec().
-    const onFFmpegProgress = ({ progress }) => {
+    const onFFmpegProgress = ({ progress, time }) => {
       if (typeof onProgress === 'function') {
-        // Map within-step progress to overall progress.
-        const overall = (stepsDone + Math.min(1, Math.max(0, progress))) / totalSteps;
+        // FFmpeg.wasm reports `progress` as 0..1 when duration is known.
+        // When it's unknown (or negative), fall back to a slow log curve
+        // based on elapsed time so the bar still moves.
+        let pct = progress;
+        if (!pct || pct < 0) {
+          // time is in microseconds; map to a curve that approaches 0.9
+          const secs = Math.max(0, (time || 0)) / 1_000_000;
+          pct = 1 - 1 / (1 + secs / 15);
+        }
+        const overall = (stepsDone + Math.min(1, Math.max(0, pct))) / totalSteps;
         onProgress(Math.min(0.99, overall));
       }
     };
@@ -155,16 +159,17 @@ export class LocalBackend {
     try {
       // 1. Write each source clip into the FFmpeg virtual FS.
       for (const [i, clip] of job.clips.entries()) {
+        onProgress?.(stepsDone / totalSteps, `Loading clip ${i + 1}/${job.clips.length}…`);
         const name = `clip_${i}.mp4`;
         await this.ffmpeg.writeFile(name, await fetchFile(clip._file));
         writtenFiles.push(name);
       }
 
       // 2. Trim each clip to its in/out range.
-      for (const trimCmd of args.trimCommands) {
+      for (const [i, trimCmd] of args.trimCommands.entries()) {
+        onProgress?.(stepsDone / totalSteps, `Trimming clip ${i + 1}/${args.trimCommands.length}…`);
         await this._exec(trimCmd);
         stepsDone++;
-        // The trimmed MKV filename is always the last argument.
         writtenFiles.push(trimCmd[trimCmd.length - 1]);
       }
 
@@ -173,12 +178,13 @@ export class LocalBackend {
       writtenFiles.push('concat_list.txt');
 
       // 4. Final concat + transcode.
+      onProgress?.(stepsDone / totalSteps, 'Encoding final output…');
       await this._exec(args.finalCommand);
       writtenFiles.push('output.mp4');
 
       // 5. Read the output back as a Blob.
       const data = await this.ffmpeg.readFile('output.mp4');
-      onProgress?.(1);
+      onProgress?.(1, 'Done');
       return new Blob([data], { type: 'video/mp4' });
 
     } finally {
@@ -213,6 +219,64 @@ export class LocalBackend {
   /** @returns {boolean} */
   canProcessLocally() {
     return typeof crossOriginIsolated !== 'undefined';
+  }
+
+  /**
+   * Compress a raw file to H.264+AAC MP4 (720p, crf 30, 64 kbps audio).
+   * Called when files are dropped into the local library so subsequent
+   * trim/export works on much smaller files.
+   *
+   * @param {File} file
+   * @param {(ratio: number) => void} [onProgress] - called with 0..1
+   * @returns {Promise<{blob: Blob, duration: number}>}
+   */
+  async importFile(file, onProgress) {
+    if (!this.loaded) await this.init();
+    const { fetchFile } = await loadModules();
+
+    const inName  = 'import_in.mp4';
+    const outName = 'import_out.mp4';
+
+    const onFFmpegProgress = ({ progress, time }) => {
+      if (typeof onProgress !== 'function') return;
+      let pct = progress;
+      if (!pct || pct < 0) {
+        const secs = Math.max(0, (time || 0)) / 1_000_000;
+        pct = 1 - 1 / (1 + secs / 15);
+      }
+      onProgress(Math.min(0.99, Math.max(0, pct)));
+    };
+    this.ffmpeg.on('progress', onFFmpegProgress);
+
+    try {
+      await this.ffmpeg.writeFile(inName, await fetchFile(file));
+      await this._exec([
+        '-i', inName,
+        '-c:v', 'libx264', '-crf', '30', '-preset', 'medium',
+        '-vf', "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease",
+        '-c:a', 'aac', '-b:a', '64k',
+        '-movflags', '+faststart',
+        '-y', outName,
+      ]);
+      const data = await this.ffmpeg.readFile(outName);
+      const blob = new Blob([data], { type: 'video/mp4' });
+
+      // Probe duration from the blob
+      const duration = await new Promise(resolve => {
+        const v = document.createElement('video');
+        v.preload = 'metadata';
+        const url = URL.createObjectURL(blob);
+        v.onloadedmetadata = () => { URL.revokeObjectURL(url); resolve(Math.round(v.duration * 100) / 100); };
+        v.onerror = () => { URL.revokeObjectURL(url); resolve(0); };
+        v.src = url;
+      });
+
+      onProgress?.(1);
+      return { blob, duration };
+    } finally {
+      this.ffmpeg.off('progress', onFFmpegProgress);
+      await this._cleanup([inName, outName]);
+    }
   }
 
   /** @returns {{ maxResolution: string, showUploadWarning: boolean }} */

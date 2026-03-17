@@ -100,7 +100,7 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 .library-row:hover { background: var(--surface2); }
 .library-row .name {
   flex: 1 1 auto; min-width: 0; font-family: 'JetBrains Mono', monospace;
-  word-break: break-all; cursor: pointer;
+  overflow-wrap: break-word; cursor: pointer;
 }
 .library-row .name:hover { color: var(--accent); }
 .lib-controls {
@@ -167,7 +167,7 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 }
 .clip-editor .editor-name {
   font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; color: var(--accent);
-  flex: 1 1 auto; min-width: 0; word-break: break-all;
+  flex: 1 1 auto; min-width: 0; overflow-wrap: break-word;
 }
 .clip-editor .editor-dur {
   font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-dim);
@@ -273,19 +273,18 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
   display: flex; align-items: center; gap: 10px;
 }
 .progress-track-wrap {
-  padding: 6px 16px 2px;
+  padding: 6px 16px 2px; display: flex; align-items: center; gap: 8px;
 }
 .progress-track {
-  position: relative; width: 100%; height: 18px; background: var(--bg); border-radius: 9px; overflow: hidden;
+  flex: 1 1 auto; height: 18px; background: var(--bg); border-radius: 9px; overflow: hidden;
 }
 .progress-bar {
   height: 100%; width: 0; background: var(--accent); border-radius: 9px;
   transition: width 0.2s;
 }
 .progress-label {
-  position: absolute; top: 0; right: 6px; bottom: 0; display: flex; align-items: center;
+  flex: 0 0 auto; min-width: 3ch; text-align: right;
   font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: var(--text-dim);
-  pointer-events: none;
 }
 
 /* ── Processing log ── */
@@ -323,7 +322,7 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 #processingSection.idle #processingStep { opacity: 0.45; }
 #processingStep.err { color: var(--danger); opacity: 1 !important; }
 #processingStep {
-  flex: 1 1 auto; min-width: 0; word-break: break-all;
+  flex: 1 1 auto; min-width: 0; overflow-wrap: break-word;
 }
 
 /* ── Settings panel ── */

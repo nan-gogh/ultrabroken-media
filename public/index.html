@@ -16,10 +16,17 @@
 if (!location.pathname.startsWith('/manage/editor')) {
   if ('serviceWorker' in navigator && !crossOriginIsolated) {
     navigator.serviceWorker.register('coi-serviceworker.js').then(function(reg) {
+      // Case 1: SW just installed for the first time → reload once it activates.
       if (reg.installing) {
         reg.installing.addEventListener('statechange', function() {
           if (this.state === 'activated') location.reload();
         });
+      // Case 2: SW was already installed/active but this page loaded before it
+      //          could intercept (e.g. first visit after a hard-refresh, or the SW
+      //          was registered but the current document wasn't fetched through it).
+      //          crossOriginIsolated is still false, so we need one more reload.
+      } else if (reg.active) {
+        location.reload();
       }
     }).catch(function(err) {
       console.warn('[coi-sw] Registration failed (single-threaded fallback):', err);

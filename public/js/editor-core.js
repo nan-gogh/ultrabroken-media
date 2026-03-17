@@ -68,6 +68,9 @@ function applyModeUI() {
   document.getElementById('libraryTitle').textContent = isRemote ? 'Video Library' : 'Footage';
   document.getElementById('dropzone').hidden = isRemote;
 
+  // Export bar: hide the "video/" prefix in local mode
+  document.getElementById('exportPrefix').hidden = isRemote ? false : true;
+
   // Export button label
   document.getElementById('exportBtn').textContent = isRemote
     ? 'Export → H.264+AAC'
@@ -176,9 +179,11 @@ function renderLocalLibrary() {
       : `<button class="btn compress-btn" onclick="compressLibraryFile(${attrJson(f.key)})" title="Compress to H.264 720p">\u2699</button>`;
     html += `<div class="library-row">`
       + `<span class="name" onclick="previewLocalFile(${attrJson(f.key)})" title="Click to preview">${name}</span>`
+      + `<div class="lib-controls">`
       + `<span class="size">${size}</span>`
       + compressBtn
       + `<button class="btn" onclick="addLocalClip(${attrJson(f.key)})">+</button>`
+      + `</div>`
       + `</div>`;
   }
   container.innerHTML = html;

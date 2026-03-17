@@ -94,21 +94,24 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 .library-list { max-height: 220px; overflow-y: auto; }
 .library-row {
   display: flex; align-items: center; padding: 7px 16px; gap: 10px;
-  border-bottom: 1px solid var(--border); font-size: 0.78rem;
+  border-bottom: 1px solid var(--border); font-size: 0.78rem; flex-wrap: wrap;
 }
 .library-row:last-child { border-bottom: none; }
 .library-row:hover { background: var(--surface2); }
 .library-row .name {
-  flex: 1; font-family: 'JetBrains Mono', monospace; word-break: break-all;
+  flex: 1 0 auto; min-width: 160px; font-family: 'JetBrains Mono', monospace; word-break: break-all;
   cursor: pointer;
 }
 .library-row .name:hover { color: var(--accent); }
+.lib-controls {
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+}
 .library-row .size {
   color: var(--text-dim); font-family: 'JetBrains Mono', monospace;
   font-size: 0.72rem; min-width: 60px; text-align: right;
 }
 .library-row .compress-btn {
-  font-size: 0.68rem; padding: 2px 6px; opacity: 0.7;
+  opacity: 0.7;
 }
 .library-row .compress-btn:hover { opacity: 1; }
 .library-row .compress-btn.done {

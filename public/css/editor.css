@@ -99,16 +99,16 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 .library-row:last-child { border-bottom: none; }
 .library-row:hover { background: var(--surface2); }
 .library-row .name {
-  flex: 1 1 auto; min-width: 0; font-family: 'JetBrains Mono', monospace;
+  flex: 1 1 100%; min-width: 0; font-family: 'JetBrains Mono', monospace;
   word-break: break-all; cursor: pointer;
 }
 .library-row .name:hover { color: var(--accent); }
 .lib-controls {
-  display: flex; align-items: center; gap: 6px; margin-left: 0; margin-right: auto;
+  display: flex; align-items: center; gap: 6px;
 }
 .library-row .size {
   color: var(--text-dim); font-family: 'JetBrains Mono', monospace;
-  font-size: 0.72rem; min-width: 60px; text-align: right;
+  font-size: 0.72rem;
 }
 .library-row .compress-btn {
   opacity: 0.7;

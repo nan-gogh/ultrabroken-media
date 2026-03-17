@@ -254,10 +254,9 @@ export class LocalBackend {
    *
    * @param {File} file
    * @param {(ratio: number) => void} [onProgress] - called with 0..1
-   * @param {number} [maxBitrateKbps] - cap video bitrate to original kbps
    * @returns {Promise<{blob: Blob, duration: number}>}
    */
-  async importFile(file, onProgress, maxBitrateKbps) {
+  async importFile(file, onProgress) {
     if (!this.loaded) await this.init();
     const { fetchFile } = await loadModules();
 
@@ -277,22 +276,15 @@ export class LocalBackend {
 
     try {
       await this.ffmpeg.writeFile(inName, await fetchFile(file));
-      const args = [
+      await this._exec([
         '-i', inName,
-        '-c:v', 'libx264', '-crf', '30', '-preset', 'veryfast',
-      ];
-      if (maxBitrateKbps > 0) {
-        const cap = Math.floor(maxBitrateKbps);
-        args.push('-maxrate', cap + 'k', '-bufsize', (cap * 2) + 'k');
-      }
-      args.push(
+        '-c:v', 'libx264', '-crf', '30', '-preset', 'medium',
         '-vf', "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease",
         '-r', '24',
         '-c:a', 'aac', '-b:a', '64k',
         '-movflags', '+faststart',
         '-y', outName,
-      );
-      await this._exec(args);
+      ]);
       const data = await this.ffmpeg.readFile(outName);
       const blob = new Blob([data], { type: 'video/mp4' });
 

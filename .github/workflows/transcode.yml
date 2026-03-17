@@ -68,13 +68,16 @@ jobs:
             echo "Original: $(numfmt --to=iec $original_size)"
 
             # Probe duration and compute original bitrate for maxrate cap
-            dur=$(ffmpeg -i "input.$ext_lower" 2>&1 | grep -oP 'Duration: \K[0-9:.]+' | head -1)
+            dur=$(ffmpeg -i "input.$ext_lower" 2>&1 | grep -oE 'Duration: [0-9:.]+' | head -1 | sed 's/Duration: //')
             if [ -n "$dur" ]; then
-              IFS=':' read -r hh mm ss <<< "$dur"
-              total_secs=$(echo "$hh * 3600 + $mm * 60 + $ss" | bc)
-              orig_kbps=$(echo "$original_size * 8 / $total_secs / 1000" | bc)
-              echo "Original bitrate: ${orig_kbps} kbps"
-              maxrate_args="-maxrate ${orig_kbps}k -bufsize $((orig_kbps * 2))k"
+              total_secs=$(echo "$dur" | awk -F: '{printf "%.0f", $1*3600 + $2*60 + $3}')
+              if [ "$total_secs" -gt 0 ] 2>/dev/null; then
+                orig_kbps=$(( original_size * 8 / total_secs / 1000 ))
+                echo "Original bitrate: ${orig_kbps} kbps"
+                maxrate_args="-maxrate ${orig_kbps}k -bufsize $((orig_kbps * 2))k"
+              else
+                maxrate_args=""
+              fi
             else
               maxrate_args=""
             fi

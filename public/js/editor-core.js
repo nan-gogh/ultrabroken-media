@@ -230,10 +230,9 @@ window.compressLibraryFile = async function(key) {
   document.getElementById('processingStep').textContent = 'Compressing ' + f.name + '\u2026';
   try {
     const originalSize = f.size;
-    const kbps = f.duration > 0 ? (f.size * 8 / f.duration) / 1000 : 0;
     const { blob, duration } = await backend.importFile(f._file, ratio => {
       setProgress(true, ratio);
-    }, kbps);
+    });
     if (blob.size >= originalSize) {
       setProgress(true, 1, true);
       showStatus(f.name + ' \u2014 already optimized, kept original (' + formatSize(originalSize) + ')', true);

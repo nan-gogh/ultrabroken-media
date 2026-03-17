@@ -5,15 +5,15 @@
  * at /manage (protected by Cloudflare Access - GitHub OAuth).
  *
  * Routes:
- *   GET  /manage        → Management UI (upload, browse, delete)
- *   GET  /manage/editor → Redirect to GitHub Pages editor (?mode=remote)
- *   GET  /api/list      → JSON listing of files in a prefix
- *   POST /api/upload    → Upload file(s) to R2
- *   POST /api/delete    → Delete a file from R2
- *   POST /api/edit      → Dispatch edit job to GitHub Actions
- *   POST /api/rename    → Rename a file in R2
- *   POST /api/purge     → Delete all files under a prefix
- *   GET  /*             → Serve file from R2 (public)
+ *   GET  /manage            → Management UI (upload, browse, delete)
+ *   GET  /manage/editor/*   → Proxied editor (GitHub Pages → same origin)
+ *   GET  /manage/api/list   → JSON listing of files in a prefix
+ *   POST /manage/api/upload → Upload file(s) to R2
+ *   POST /manage/api/delete → Delete a file from R2
+ *   POST /manage/api/edit   → Dispatch edit job to GitHub Actions
+ *   POST /manage/api/rename → Rename a file in R2
+ *   POST /manage/api/purge  → Delete all files under a prefix
+ *   GET  /*                 → Serve file from R2 (public)
  */
 
 const ALLOWED_PREFIXES = ["image/", "video/", "social/"];
@@ -106,17 +106,17 @@ async function handleGet(request, env) {
 
 // -- Bearer token auth ------------------------------------------------------
 //
-// All management API routes support two authentication paths:
-//   1. Cloudflare Access cookie (CF-Authorization JWT) -- used by the inline
-//      management page on the Worker origin.  Auth is enforced at the CF edge
-//      before the Worker function runs, so no Worker-level check is needed.
-//   2. Bearer token (Authorization: Bearer <GITHUB_TOKEN>) -- used by the
-//      GitHub Pages editor on a different origin.  requireBearerAuth() checks
-//      this token so the route works even if CF Access does not cover the API
-//      paths (e.g. when a service-auth bypass policy is active).
+// Management API routes (/manage/api/*) are protected by CF Access at the edge.
+// Browser clients (the proxied editor, the inline manage page) are authenticated
+// automatically via the CF_Authorization cookie — no extra headers needed.
 //
-// When GITHUB_TOKEN is set, any request with a matching Bearer token is
-// accepted.  When it is unset, CF Access at the edge is the sole gate.
+// requireBearerAuth() provides a secondary auth path: requests that carry a
+// valid Authorization: Bearer <GITHUB_TOKEN> header are accepted even without a
+// CF Access session.  This enables non-browser automation (scripts, Actions
+// runners, etc.) when paired with a CF Access Service Token to pass the edge.
+//
+// When GITHUB_TOKEN is unset, Bearer auth is disabled and CF Access at the edge
+// is the sole gate.
 
 function requireBearerAuth(request, env) {
   if (!env.GITHUB_TOKEN) return null; // CF Access is the only gate -- skip check
@@ -441,6 +441,42 @@ function withCors(response, request) {
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers: h });
 }
 
+// ── Editor proxy ────────────────────────────────────────────────────────────
+//
+// Serve the GitHub Pages editor from /manage/editor/* so it shares the Worker
+// origin.  CF Access gates /manage/* at the edge — once the user passes GitHub
+// OAuth, the CF_Authorization cookie covers both the page load and every
+// same-origin fetch to /manage/api/*.  No Bearer token or settings panel needed.
+
+const PROXY_MIMES = { js: 'application/javascript', mjs: 'application/javascript', css: 'text/css', html: 'text/html; charset=utf-8', json: 'application/json', svg: 'image/svg+xml', png: 'image/png', ico: 'image/x-icon', woff2: 'font/woff2' };
+
+async function handleEditorProxy(request, env, path) {
+  const ghRepo = env.GITHUB_REPO || 'nan-gogh/ultrabroken-media';
+  const [ghOwner, ghRepoName] = ghRepo.split('/');
+  const pagesOrigin = `https://${ghOwner}.github.io/${ghRepoName}`;
+
+  // Strip the /manage/editor prefix to get the subpath within public/
+  let subpath = path.slice('/manage/editor'.length);
+  if (!subpath || subpath === '/') subpath = '/index.html';
+
+  const pagesUrl = pagesOrigin + subpath;
+  const resp = await fetch(pagesUrl, {
+    headers: { 'User-Agent': 'ultrabroken-media-worker' },
+    cf: { cacheTtl: 300 },          // cache Pages assets for 5 min at CF edge
+  });
+
+  if (!resp.ok) {
+    return new Response('Editor file not found: ' + subpath, { status: resp.status });
+  }
+
+  const headers = new Headers();
+  const ext = subpath.split('.').pop().toLowerCase();
+  headers.set('Content-Type', PROXY_MIMES[ext] || resp.headers.get('Content-Type') || 'application/octet-stream');
+  headers.set('Cache-Control', 'public, max-age=300');
+
+  return new Response(resp.body, { status: 200, headers });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -469,36 +505,32 @@ export default {
         headers: { "Content-Type": "text/html; charset=utf-8" },
       });
     }
-    // API routes — outside /manage/* so they are NOT covered by CF Access.
-    // Auth is handled by requireBearerAuth() inside each handler.
-    if (path === "/api/list" && request.method === "GET") {
+
+    // Editor proxy — serve the GitHub Pages editor from the Worker domain so
+    // the CF Access cookie covers the page and all its API calls.  CF Access
+    // gates /manage/* at the edge; no extra auth needed in the browser.
+    if (path.startsWith("/manage/editor")) {
+      return handleEditorProxy(request, env, path);
+    }
+
+    // Management API — under /manage/* so CF Access gates these at the edge.
+    // requireBearerAuth() provides a secondary auth path for non-browser clients.
+    if (path === "/manage/api/list" && request.method === "GET") {
       return withCors(await handleList(request, env), request);
     }
-    if (path === "/api/upload" && request.method === "POST") {
+    if (path === "/manage/api/upload" && request.method === "POST") {
       return withCors(await handleUpload(request, env), request);
     }
-    if (path === "/api/delete" && request.method === "POST") {
+    if (path === "/manage/api/delete" && request.method === "POST") {
       return withCors(await handleDelete(request, env), request);
     }
-    if (path === "/api/purge" && request.method === "POST") {
+    if (path === "/manage/api/purge" && request.method === "POST") {
       return withCors(await handlePurge(request, env), request);
     }
-    if (path === "/manage/editor" || path === "/manage/editor/") {
-      // Derive the GitHub Pages URL from GITHUB_REPO (already required by other
-      // routes) unless the admin has explicitly overridden it with EDITOR_ORIGIN.
-      // GitHub Pages URLs are always https://<owner>.github.io/<repo>.
-      const ghRepo = env.GITHUB_REPO || 'nan-gogh/ultrabroken-media';
-      const [ghOwner, ghRepoName] = ghRepo.split('/');
-      const editorOrigin = (env.EDITOR_ORIGIN || `https://${ghOwner}.github.io/${ghRepoName}`).replace(/\/$/, '');
-      // Extract Worker origin from request URL and pass it as a param so the
-      // editor knows where to send API requests (required for cross-origin auth).
-      const workerOrigin = new URL(request.url).origin;
-      return Response.redirect(`${editorOrigin}/?mode=remote&origin=${encodeURIComponent(workerOrigin)}`, 302);
-    }
-    if (path === "/api/edit" && request.method === "POST") {
+    if (path === "/manage/api/edit" && request.method === "POST") {
       return withCors(await handleEdit(request, env), request);
     }
-    if (path === "/api/rename" && request.method === "POST") {
+    if (path === "/manage/api/rename" && request.method === "POST") {
       return withCors(await handleRename(request, env), request);
     }
     // Public file serving
@@ -694,7 +726,7 @@ const MANAGE_HTML = `<!DOCTYPE html>
 </div>
 
 <script>
-const API = "/api";
+const API = "/manage/api";
 let currentPrefix = "image/";
 
 // â”€â”€ Tab switching â”€â”€

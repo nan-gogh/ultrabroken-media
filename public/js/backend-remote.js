@@ -2,25 +2,17 @@
  * backend-remote.js
  *
  * Remote backend for the video editor. Lists videos from R2 via the Worker
- * API and dispatches edit jobs to GitHub Actions via /api/edit.
+ * management API and dispatches edit jobs to GitHub Actions via /manage/api/edit.
  *
- * Authentication: the Worker's /api/* routes live outside the /manage path,
- * so they are NOT covered by Cloudflare Access.  Instead, requireBearerAuth()
- * in the Worker validates the Authorization: Bearer token on every request.
- *
- * The GITHUB_TOKEN Worker env var value is the shared secret — the same value
- * the user pastes into the settings panel.  It is stored in localStorage.
+ * Authentication: the editor is served from the Worker origin at /manage/editor/*
+ * which is gated by Cloudflare Access (GitHub OAuth).  The CF_Authorization
+ * cookie covers all same-origin fetches to /manage/api/* automatically —
+ * no Bearer tokens or manual config needed.
  */
 
 export class RemoteBackend {
-  /**
-   * @param {string} workerOrigin  e.g. "https://your-worker.workers.dev"
-   * @param {string} token         GitHub PAT with actions:write scope
-   */
-  constructor(workerOrigin, token) {
+  constructor() {
     this.mode = 'remote';
-    this.origin = workerOrigin.replace(/\/$/, '');
-    this.token = token || '';
   }
 
   /**
@@ -34,9 +26,7 @@ export class RemoteBackend {
     do {
       const params = new URLSearchParams({ prefix: 'video/' });
       if (cursor) params.set('cursor', cursor);
-      const res = await fetch(`${this.origin}/api/list?${params}`, {
-        headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
-      });
+      const res = await fetch(`/manage/api/list?${params}`);
       if (!res.ok) throw new Error(`List failed: ${res.status}`);
       const data = await res.json();
       allFiles.push(...data.files.filter(f => f.size > 0));
@@ -51,7 +41,7 @@ export class RemoteBackend {
    * @returns {string}
    */
   getPreviewUrl(file) {
-    return `${this.origin}/${file.key}`;
+    return '/' + file.key;
   }
 
   /**
@@ -66,12 +56,9 @@ export class RemoteBackend {
       output: job.outputKey,
       force: job.force || false,
     };
-    const res = await fetch(`${this.origin}/api/edit`, {
+    const res = await fetch('/manage/api/edit', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
     return res.json();

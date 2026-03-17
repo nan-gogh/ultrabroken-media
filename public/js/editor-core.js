@@ -14,9 +14,6 @@
  *   doExport()           — validate and dispatch export
  *   cancelExport()       — abort an in-progress local export
  *   addOverlay()         — add a blank text overlay row
- *   toggleSettings()     — show/hide the settings panel
- *   saveRemoteSettings() — read settings panel inputs, persist, switch mode
- *   clearRemoteSettings()— remove persisted settings, switch to local mode
  */
 
 // ── State ──────────────────────────────────────────────────────────────────
@@ -82,47 +79,6 @@ export function showStatus(msg, ok, duration) {
   if (duration !== 0) {
     statusTimer = setTimeout(() => { el.textContent = ''; el.className = 'status'; }, duration || 8000);
   }
-}
-
-// ── Settings panel ─────────────────────────────────────────────────────────
-
-export function toggleSettings() {
-  const panel = document.getElementById('settingsPanel');
-  panel.hidden = !panel.hidden;
-  if (!panel.hidden) {
-    document.getElementById('cfWorkerOrigin').value =
-      localStorage.getItem('ub-media-origin') || '';
-    document.getElementById('cfToken').value =
-      localStorage.getItem('ub-media-token') || '';
-  }
-}
-
-export function saveRemoteSettings() {
-  const origin = document.getElementById('cfWorkerOrigin').value.trim();
-  const token = document.getElementById('cfToken').value.trim();
-  if (!origin) { showStatus('Enter the Worker origin URL', false); return; }
-  localStorage.setItem('ub-media-origin', origin);
-  if (token) localStorage.setItem('ub-media-token', token);
-  else localStorage.removeItem('ub-media-token');
-  document.getElementById('settingsPanel').hidden = true;
-  showStatus('Saved — reloading in remote mode…', true, 2000);
-  setTimeout(() => {
-    const url = new URL(location.href);
-    url.searchParams.set('mode', 'remote');
-    location.href = url.toString();
-  }, 1500);
-}
-
-export function clearRemoteSettings() {
-  localStorage.removeItem('ub-media-origin');
-  localStorage.removeItem('ub-media-token');
-  document.getElementById('settingsPanel').hidden = true;
-  showStatus('Disconnected — reloading in local mode…', true, 2000);
-  setTimeout(() => {
-    const url = new URL(location.href);
-    url.searchParams.delete('mode');
-    location.href = url.toString();
-  }, 1500);
 }
 
 // ── Local file picker ──────────────────────────────────────────────────────
@@ -654,6 +610,3 @@ window.addOverlay = addOverlay;
 window.doExport = doExport;
 window.cancelExport = cancelExport;
 window.loadLibrary = loadLibrary;
-window.toggleSettings = toggleSettings;
-window.saveRemoteSettings = saveRemoteSettings;
-window.clearRemoteSettings = clearRemoteSettings;

@@ -8,8 +8,15 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=New+Rocker&family=Texturina:ital,opsz,wght@0,12..44,100..900;1,12..44,100..900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/editor.css">
-<!-- coi-serviceworker registers COOP/COEP headers for SharedArrayBuffer (FFmpeg.wasm multithreading) -->
-<script src="coi-serviceworker.js"></script>
+<!-- COI service worker: only needed in local mode for FFmpeg.wasm SharedArrayBuffer.
+     Remote mode runs entirely server-side, so skip the SW (avoids a first-visit reload). -->
+<script>
+if (!location.pathname.startsWith('/manage/editor')) {
+  var s = document.createElement('script');
+  s.src = 'coi-serviceworker.js';
+  document.head.appendChild(s);
+}
+</script>
 </head>
 <body>
 
@@ -17,30 +24,8 @@
   <h1>Ultrabroken Archives <span class="sub">Video Editor</span></h1>
   <div style="display:flex;gap:8px;align-items:center;">
     <span id="modeLabel" class="mode-label">local</span>
-    <button class="btn" id="settingsBtn" onclick="toggleSettings()" title="Settings">⚙</button>
   </div>
 </header>
-
-<!-- Settings panel (remote mode config) -->
-<div class="settings-panel" id="settingsPanel" hidden>
-  <div class="settings-inner">
-    <div class="section-header">Remote Settings</div>
-    <form id="remoteSettingsForm" onsubmit="return false;">
-      <div class="settings-field">
-        <label for="cfWorkerOrigin">Worker origin</label>
-        <input type="text" id="cfWorkerOrigin" placeholder="https://your-worker.workers.dev" spellcheck="false">
-      </div>
-      <div class="settings-field">
-        <label for="cfToken">GitHub PAT <span class="settings-hint">(actions:write scope)</span></label>
-        <input type="password" id="cfToken" placeholder="ghp_..." autocomplete="off">
-      </div>
-      <div class="settings-actions">
-        <button type="button" class="btn primary" onclick="saveRemoteSettings()">Connect</button>
-        <button type="button" class="btn" onclick="clearRemoteSettings()">Disconnect</button>
-      </div>
-    </form>
-  </div>
-</div>
 
 <div id="status"></div>
 

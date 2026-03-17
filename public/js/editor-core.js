@@ -66,6 +66,7 @@ function applyModeUI() {
   document.getElementById('librarySection').hidden = false;
   document.getElementById('libraryRefresh').style.display = isRemote ? '' : 'none';
   document.getElementById('libraryTitle').textContent = isRemote ? 'Video Library' : 'Footage';
+  document.getElementById('localCompressControl').hidden = true;
   document.getElementById('dropzone').hidden = isRemote;
 
   // Export bar: hide the "video/" prefix in local mode
@@ -172,7 +173,7 @@ function renderLocalLibrary() {
     return;
   }
   const compressControl = document.getElementById('localCompressControl');
-  if (compressControl) compressControl.hidden = !localLibrary.some(f => !f.compressed);
+  if (compressControl) compressControl.hidden = backend.mode === 'remote' || !localLibrary.some(f => !f.compressed);
   let html = '';
   for (const f of localLibrary) {
     const name = escHtml(f.name);

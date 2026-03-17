@@ -1,4 +1,4 @@
-/**
+﻿/**
  * backend-local.js
  *
  * Local backend for the video editor.  All processing runs in-browser via
@@ -98,21 +98,10 @@ export class LocalBackend {
     const classWorkerURL = new URL(CLASS_WORKER_PATH, location.href).href;
 
     if (crossOriginIsolated) {
-      // Fetch core JS as text and patch the compile-time PTHREAD_POOL_SIZE.
-      // @ffmpeg/core-mt was compiled with PTHREAD_POOL_SIZE=0 (on-demand only).
-      // On-demand pthread creation requires the event loop, but exec() blocks it
-      // — deadlocking any codec that calls pthread_create().  Patching the JS to
-      // pre-allocate a pool before exec() runs eliminates the deadlock.
-      const poolSize = (navigator.hardwareConcurrency ?? 4) + 4;
-      const coreText = await fetch(`${CORE_MT_BASE}/ffmpeg-core.js`).then(r => r.text());
-      const patched  = coreText.replace(
-        /PTHREAD_POOL_SIZE\s*=\s*\d+/,
-        `PTHREAD_POOL_SIZE=${poolSize}`,
-      );
-      const coreURL   = URL.createObjectURL(new Blob([patched], { type: 'text/javascript' }));
+      const coreURL   = await toBlobURL(`${CORE_MT_BASE}/ffmpeg-core.js`,        'text/javascript');
       const wasmURL   = await toBlobURL(`${CORE_MT_BASE}/ffmpeg-core.wasm`,      'application/wasm');
       const workerURL = await toBlobURL(`${CORE_MT_BASE}/ffmpeg-core.worker.js`, 'text/javascript');
-      this.onLog?.(`Loading multi-threaded core (pool = ${poolSize})…`);
+      this.onLog?.('Loading multi-threaded core…');
       await this.ffmpeg.load({ classWorkerURL, coreURL, wasmURL, workerURL });
     } else {
       const coreURL = await toBlobURL(`${CORE_BASE}/ffmpeg-core.js`,   'text/javascript');
@@ -230,6 +219,13 @@ export class LocalBackend {
    * @param {string[]} cmd
    */
   async _exec(cmd) {
+    // Emscripten 3.1.40's pthread proxy mechanism deadlocks when encoder
+    // threads make proxied syscalls (mmap, write, …) while the class
+    // worker's main WASM thread is blocked in memory.atomic.wait32.
+    // Cap all thread counts to 1 when running the MT core.
+    if (crossOriginIsolated) {
+      cmd = ['-threads', '1', '-filter_threads', '1', ...cmd];
+    }
     const ret = await this.ffmpeg.exec(cmd);
     if (ret !== 0) {
       throw new Error(`FFmpeg exited with code ${ret}. Command: ${cmd.join(' ')}`);

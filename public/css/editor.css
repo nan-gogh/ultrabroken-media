@@ -99,7 +99,7 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 .library-row:last-child { border-bottom: none; }
 .library-row:hover { background: var(--surface2); }
 .library-row .name {
-  flex: 1 1 100%; min-width: 0; font-family: 'JetBrains Mono', monospace;
+  flex: 1 1 auto; min-width: 0; font-family: 'JetBrains Mono', monospace;
   word-break: break-all; cursor: pointer;
 }
 .library-row .name:hover { color: var(--accent); }

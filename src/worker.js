@@ -5,11 +5,15 @@
  * at /manage (protected by Cloudflare Access - GitHub OAuth).
  *
  * Routes:
- *   GET  /manage           â†’ Management UI (upload, browse, delete)
- *   GET  /manage/api/list  â†’ JSON listing of files in a prefix
- *   POST /manage/api/upload â†’ Upload file(s) to R2
- *   POST /manage/api/delete â†’ Delete a file from R2
- *   GET  /*                 â†’ Serve file from R2 (public)
+ *   GET  /manage        → Management UI (upload, browse, delete)
+ *   GET  /manage/editor → Redirect to GitHub Pages editor (?mode=remote)
+ *   GET  /api/list      → JSON listing of files in a prefix
+ *   POST /api/upload    → Upload file(s) to R2
+ *   POST /api/delete    → Delete a file from R2
+ *   POST /api/edit      → Dispatch edit job to GitHub Actions
+ *   POST /api/rename    → Rename a file in R2
+ *   POST /api/purge     → Delete all files under a prefix
+ *   GET  /*             → Serve file from R2 (public)
  */
 
 const ALLOWED_PREFIXES = ["image/", "video/", "social/"];
@@ -100,7 +104,40 @@ async function handleGet(request, env) {
 
 // â”€â”€ Management API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+// -- Bearer token auth ------------------------------------------------------
+//
+// All management API routes support two authentication paths:
+//   1. Cloudflare Access cookie (CF-Authorization JWT) -- used by the inline
+//      management page on the Worker origin.  Auth is enforced at the CF edge
+//      before the Worker function runs, so no Worker-level check is needed.
+//   2. Bearer token (Authorization: Bearer <GITHUB_TOKEN>) -- used by the
+//      GitHub Pages editor on a different origin.  requireBearerAuth() checks
+//      this token so the route works even if CF Access does not cover the API
+//      paths (e.g. when a service-auth bypass policy is active).
+//
+// When GITHUB_TOKEN is set, any request with a matching Bearer token is
+// accepted.  When it is unset, CF Access at the edge is the sole gate.
+
+function requireBearerAuth(request, env) {
+  if (!env.GITHUB_TOKEN) return null; // CF Access is the only gate -- skip check
+
+  const authHeader = request.headers.get('Authorization');
+  if (authHeader) {
+    const spaceIdx = authHeader.indexOf(' ');
+    const scheme   = authHeader.slice(0, spaceIdx);
+    const token    = authHeader.slice(spaceIdx + 1).trim();
+    if (scheme === 'Bearer' && token === env.GITHUB_TOKEN) return null; // OK
+    // Header present but wrong -- reject to prevent brute-forcing via other paths.
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  // No Authorization header -- let CF Access handle it.
+  return null;
+}
+
 async function handleList(request, env) {
+  const authErr = requireBearerAuth(request, env);
+  if (authErr) return authErr;
+
   const url = new URL(request.url);
   const prefix = url.searchParams.get("prefix") || "";
   const cursor = url.searchParams.get("cursor") || undefined;
@@ -128,6 +165,9 @@ async function handleList(request, env) {
 }
 
 async function handleUpload(request, env) {
+  const authErr = requireBearerAuth(request, env);
+  if (authErr) return authErr;
+
   const contentType = request.headers.get("Content-Type") || "";
 
   if (!contentType.includes("multipart/form-data")) {
@@ -214,6 +254,9 @@ async function handleUpload(request, env) {
 }
 
 async function handleDelete(request, env) {
+  const authErr = requireBearerAuth(request, env);
+  if (authErr) return authErr;
+
   const { key } = await request.json();
 
   if (!isValidKey(key)) {
@@ -225,6 +268,9 @@ async function handleDelete(request, env) {
 }
 
 async function handlePurge(request, env) {
+  const authErr = requireBearerAuth(request, env);
+  if (authErr) return authErr;
+
   const { prefix } = await request.json();
 
   if (!prefix || !ALLOWED_PREFIXES.some((p) => prefix === p || prefix.startsWith(p))) {
@@ -244,6 +290,9 @@ async function handlePurge(request, env) {
 }
 
 async function handleEdit(request, env) {
+  const authErr = requireBearerAuth(request, env);
+  if (authErr) return authErr;
+
   const body = await request.json();
   const { clips, output, force, overlays } = body;
 
@@ -336,6 +385,9 @@ async function handleEdit(request, env) {
 }
 
 async function handleRename(request, env) {
+  const authErr = requireBearerAuth(request, env);
+  if (authErr) return authErr;
+
   const { key, newKey } = await request.json();
 
   if (!isValidKey(key)) {
@@ -367,18 +419,46 @@ async function handleRename(request, env) {
   return Response.json({ renamed: newKey });
 }
 
+// ── CORS helper ─────────────────────────────────────────────────────────────
+//
+// The management API is accessed both from the Worker's own origin (the inline
+// MANAGE_HTML page, via Cloudflare Access) and from the separate GitHub Pages
+// editor (via Authorization: Bearer token).  For the cross-origin case the
+// browser requires specific-origin CORS + Allow-Credentials: true — wildcards
+// are incompatible with credentialed requests.
+//
+// We reflect the request's Origin back to satisfy that requirement.  Auth is
+// enforced by Cloudflare Access at the edge (management HTML) and/or by Bearer
+// token validation in the handler (GitHub Pages editor).
+
+function withCors(response, request) {
+  const origin = request.headers.get('Origin');
+  if (!origin) return response;                    // same-origin — no CORS needed
+  const h = new Headers(response.headers);
+  h.set('Access-Control-Allow-Origin', origin);
+  h.set('Access-Control-Allow-Credentials', 'true');
+  h.set('Vary', 'Origin');
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers: h });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const path = url.pathname;
 
-    // CORS preflight
+    // CORS preflight — reflect the requesting Origin so credentialed
+    // cross-origin fetches (e.g. from the GitHub Pages editor) work correctly.
     if (request.method === "OPTIONS") {
+      const origin = request.headers.get('Origin') || '*';
       return new Response(null, {
         headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type",
+          'Access-Control-Allow-Origin': origin,
+          'Access-Control-Allow-Credentials': 'true',
+          'Vary': 'Origin',
+          'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+          // Authorization: Bearer token auth for the GitHub Pages editor.
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          'Access-Control-Max-Age': '86400',
         },
       });
     }
@@ -389,28 +469,34 @@ export default {
         headers: { "Content-Type": "text/html; charset=utf-8" },
       });
     }
-    if (path === "/manage/api/list" && request.method === "GET") {
-      return handleList(request, env);
+    // API routes — outside /manage/* so they are NOT covered by CF Access.
+    // Auth is handled by requireBearerAuth() inside each handler.
+    if (path === "/api/list" && request.method === "GET") {
+      return withCors(await handleList(request, env), request);
     }
-    if (path === "/manage/api/upload" && request.method === "POST") {
-      return handleUpload(request, env);
+    if (path === "/api/upload" && request.method === "POST") {
+      return withCors(await handleUpload(request, env), request);
     }
-    if (path === "/manage/api/delete" && request.method === "POST") {
-      return handleDelete(request, env);
+    if (path === "/api/delete" && request.method === "POST") {
+      return withCors(await handleDelete(request, env), request);
     }
-    if (path === "/manage/api/purge" && request.method === "POST") {
-      return handlePurge(request, env);
+    if (path === "/api/purge" && request.method === "POST") {
+      return withCors(await handlePurge(request, env), request);
     }
     if (path === "/manage/editor" || path === "/manage/editor/") {
-      return new Response(EDITOR_HTML, {
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      });
+      // Derive the GitHub Pages URL from GITHUB_REPO (already required by other
+      // routes) unless the admin has explicitly overridden it with EDITOR_ORIGIN.
+      // GitHub Pages URLs are always https://<owner>.github.io/<repo>.
+      const ghRepo = env.GITHUB_REPO || 'nan-gogh/ultrabroken-media';
+      const [ghOwner, ghRepoName] = ghRepo.split('/');
+      const editorOrigin = (env.EDITOR_ORIGIN || `https://${ghOwner}.github.io/${ghRepoName}`).replace(/\/$/, '');
+      return Response.redirect(`${editorOrigin}/?mode=remote`, 302);
     }
-    if (path === "/manage/api/edit" && request.method === "POST") {
-      return handleEdit(request, env);
+    if (path === "/api/edit" && request.method === "POST") {
+      return withCors(await handleEdit(request, env), request);
     }
-    if (path === "/manage/api/rename" && request.method === "POST") {
-      return handleRename(request, env);
+    if (path === "/api/rename" && request.method === "POST") {
+      return withCors(await handleRename(request, env), request);
     }
     // Public file serving
     if (request.method === "GET" || request.method === "HEAD") {
@@ -605,7 +691,7 @@ const MANAGE_HTML = `<!DOCTYPE html>
 </div>
 
 <script>
-const API = "/manage/api";
+const API = "/api";
 let currentPrefix = "image/";
 
 // â”€â”€ Tab switching â”€â”€
@@ -1153,7 +1239,7 @@ const EDITOR_HTML = `<!DOCTYPE html>
 </div>
 
 <script>
-var API = "/manage/api";
+var API = "/api";
 var BASE_URL = location.origin + "/";
 var clips = [];
 var nextClipId = 1;

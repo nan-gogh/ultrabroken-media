@@ -206,15 +206,18 @@ export function embedFontInAss(assContent, fontFilename, fontData) {
   let encoded = '';
   let line = '';
   for (let i = 0; i < fontData.length; i += 3) {
+    const remaining = fontData.length - i;
     const b0 = fontData[i];
-    const b1 = i + 1 < fontData.length ? fontData[i + 1] : 0;
-    const b2 = i + 2 < fontData.length ? fontData[i + 2] : 0;
-    line += String.fromCharCode(
-      (b0 >> 2) + 33,
-      (((b0 & 3) << 4) | (b1 >> 4)) + 33,
-      (((b1 & 0xF) << 2) | (b2 >> 6)) + 33,
-      (b2 & 0x3F) + 33,
-    );
+    const b1 = remaining > 1 ? fontData[i + 1] : 0;
+    const b2 = remaining > 2 ? fontData[i + 2] : 0;
+    const c0 = String.fromCharCode((b0 >> 2) + 33);
+    const c1 = String.fromCharCode((((b0 & 3) << 4) | (b1 >> 4)) + 33);
+    const c2 = String.fromCharCode((((b1 & 0xF) << 2) | (b2 >> 6)) + 33);
+    const c3 = String.fromCharCode((b2 & 0x3F) + 33);
+    // Last group: truncate chars to remaining+1 so libass decodes
+    // the correct byte count (1 byte→2 chars, 2→3, 3→4).
+    const chars = remaining >= 3 ? 4 : remaining + 1;
+    line += (c0 + c1 + c2 + c3).slice(0, chars);
     if (line.length >= 80) {
       encoded += line + '\n';
       line = '';

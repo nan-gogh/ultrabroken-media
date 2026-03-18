@@ -95,15 +95,13 @@ export function buildFFmpegArgs(job, opts = {}) {
   if (job.overlays && job.overlays.length > 0) {
     const valid = job.overlays.filter(ov => ov.text.trim());
     if (valid.length) {
-      // All positioning uses h-based math so both FFmpeg versions compute
-      // identical values — no dependency on font rendering internals (th).
-      // fontsize=h/20 (36px@720p), lineH=h/16 (45px@720p, ~1.25× fontsize),
-      // boxborderw=8, marginB=32.  FFmpeg 5.1.4 doesn't support expressions
-      // for boxborderw so it stays as a fixed integer.
+      // fontsize=h/20 for version-consistent sizing.  All other values fixed
+      // pixels — both pipelines scale to 720p so this is safe.
+      // lineStep (50px) < box height (~58px) so backdrops always overlap.
       const fontSizeExpr = 'h/20';
-      const lineHExpr    = 'h/16';   // replaces th — deterministic across versions
       const boxBorderW   = 8;
       const marginB      = 32;
+      const lineStep     = 50;
 
       // Collect all unique boundary times
       const times = new Set();
@@ -123,16 +121,15 @@ export function buildFFmpegArgs(job, opts = {}) {
             .replace(/'/g, '\u2019')
             .replace(/:/g, '\\\\:')
             .replace(/%/g, '%%%%');
-          // Stack bottom-to-top using deterministic h-based line height.
-          // boxborderw=8 ensures backdrops overlap to close any gap.
+          // Simple fixed-pixel stacking, bottom-to-top.
           const revIdx = n - 1 - li;
-          const yExpr = `h-${marginB}-(${revIdx + 1})*(${lineHExpr})-(${2 * revIdx + 1})*${boxBorderW}`;
+          const yOff = marginB + (revIdx + 1) * lineStep;
           vf += `,drawtext=text='${safeText}'`
             + `:enable='between(t,${segStart},${segEnd})'`
             + `:fontsize=${fontSizeExpr}:fontcolor=0x00f0c2`
             + `:box=1:boxcolor=0x1e1f29:boxborderw=${boxBorderW}`
             + (opts.fontFile ? `:fontfile=${opts.fontFile}` : '')
-            + `:x=(w-tw)/2:y=${yExpr}`;
+            + `:x=(w-tw)/2:y=h-${yOff}`;
         }
       }
     }

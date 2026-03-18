@@ -95,12 +95,13 @@ export function buildFFmpegArgs(job, opts = {}) {
   if (job.overlays && job.overlays.length > 0) {
     const valid = job.overlays.filter(ov => ov.text.trim());
     if (valid.length) {
-      // All dimensions proportional to frame height for identical results
-      // across FFmpeg versions and resolutions.
-      // At 720p: fontsize≈36, boxborderw≈8, marginB≈32
-      const fontSizeExpr  = 'h/20';
-      const boxBorderExpr = 'h/90';
-      const marginBExpr   = 'h/23';
+      // fontsize proportional to height for consistent size across FFmpeg versions.
+      // boxborderw and marginB are fixed pixels — both pipelines scale to 720p
+      // so fixed values are safe, and FFmpeg 5.1.4 doesn't support expressions
+      // for boxborderw.
+      const fontSizeExpr = 'h/20';
+      const boxBorderW   = 8;
+      const marginB      = 32;
 
       // Collect all unique boundary times
       const times = new Set();
@@ -121,13 +122,13 @@ export function buildFFmpegArgs(job, opts = {}) {
             .replace(/:/g, '\\\\:')
             .replace(/%/g, '%%%%');
           // Stack bottom-to-top using th (actual rendered text height).
-          // boxborderw ensures backdrops overlap to close any gap.
+          // boxborderw=8 ensures backdrops overlap to close any gap.
           const revIdx = n - 1 - li;
-          const yExpr = `h-(${marginBExpr})-(${revIdx + 1})*th-(${2 * revIdx + 1})*(${boxBorderExpr})`;
+          const yExpr = `h-${marginB}-(${revIdx + 1})*th-(${2 * revIdx + 1})*${boxBorderW}`;
           vf += `,drawtext=text='${safeText}'`
             + `:enable='between(t,${segStart},${segEnd})'`
             + `:fontsize=${fontSizeExpr}:fontcolor=0x00f0c2`
-            + `:box=1:boxcolor=0x1e1f29:boxborderw=${boxBorderExpr}`
+            + `:box=1:boxcolor=0x1e1f29:boxborderw=${boxBorderW}`
             + (opts.fontFile ? `:fontfile=${opts.fontFile}` : '')
             + `:x=(w-tw)/2:y=${yExpr}`;
         }

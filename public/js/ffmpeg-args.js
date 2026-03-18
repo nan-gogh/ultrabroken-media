@@ -103,7 +103,7 @@ export function buildFFmpegArgs(job, opts = {}) {
     const valid = job.overlays.filter(ov => ov.text.trim());
     if (valid.length) {
       assContent = buildAssContent(valid, opts.fontFamily || 'Arial');
-      vf += ',ass=subs.ass' + (opts.fontFile ? ':fontsdir=.' : '');
+      vf += ',subtitles=subs.ass' + (opts.fontFile ? ':fontsdir=.' : '');
     }
   }
 

@@ -10,6 +10,8 @@
  * no Bearer tokens or manual config needed.
  */
 
+import { buildFFmpegArgs } from './ffmpeg-args.js';
+
 export class RemoteBackend {
   constructor() {
     this.mode = 'remote';
@@ -50,9 +52,10 @@ export class RemoteBackend {
    * @returns {Promise<{ok: boolean, output?: string, error?: string}>}
    */
   async execute(job) {
+    const { vf } = buildFFmpegArgs(job, { preset: 'slow' });
     const payload = {
       clips: job.clips.map(c => ({ key: c.key, start: c.start, end: c.end })),
-      overlays: job.overlays.filter(ov => ov.text.trim()),
+      vf,
       output: job.outputKey,
       force: job.force || false,
     };

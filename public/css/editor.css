@@ -266,7 +266,6 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
   flex: 1 0 auto; min-width: 180px; background: var(--bg); border: 1px solid var(--border);
   border-radius: 3px; color: var(--text); padding: 4px 8px;
   font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
-  text-align: center;
 }
 .overlay-row input[type="text"]:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
 .ov-controls {

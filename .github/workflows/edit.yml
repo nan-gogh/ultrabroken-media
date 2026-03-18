@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       edit:
-        description: 'JSON: {"clips":[{"key":"...","start":0,"end":-1},...], "output":"video/name.mp4"}'
+        description: 'JSON: {"clips":[{"key":"...","start":0,"end":-1},...], "output":"video/name.mp4", "vf":"..."}'
         required: true
         type: string
 
@@ -102,21 +102,8 @@ jobs:
           echo ""
           echo "=== Concatenating + Transcoding to H.264+AAC ==="
 
-          # Build video filter chain (setpts normalises timestamps so drawtext enable expressions are correct)
-          VF="setpts=PTS-STARTPTS,scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease"
-
-          # Add text overlays if present
-          OVERLAY_COUNT=$(echo "$EDIT_JSON" | jq '.overlays | length // 0')
-          if [ "$OVERLAY_COUNT" -gt 0 ]; then
-            echo "Text overlays: $OVERLAY_COUNT"
-            for oi in $(seq 0 $(( OVERLAY_COUNT - 1 ))); do
-              OV_TEXT=$(echo "$EDIT_JSON" | jq -r ".overlays[$oi].text")
-              OV_START=$(echo "$EDIT_JSON" | jq -r ".overlays[$oi].start")
-              OV_END=$(echo "$EDIT_JSON" | jq -r ".overlays[$oi].end")
-              echo "  Overlay $((oi+1)): \"$OV_TEXT\" ${OV_START}s\u2013${OV_END}s"
-              VF="${VF},drawtext=text='${OV_TEXT}':enable='between(t,${OV_START},${OV_END})':fontsize=36:fontcolor=white:x=(w-tw)/2:y=h-th-40:box=1:boxcolor=black@0.5:boxborderw=8"
-            done
-          fi
+          # Video filter chain is built client-side by ffmpeg-args.js (single source of truth)
+          VF=$(echo "$EDIT_JSON" | jq -r '.vf')
 
           echo "VF=$VF"
 

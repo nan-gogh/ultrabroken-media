@@ -2,12 +2,10 @@
  * ffmpeg-args.js
  *
  * Builds the FFmpeg command arrays for a trim+concat+transcode edit job.
- * This is the single source of truth for FFmpeg arguments shared between:
+ * This is the single source of truth for FFmpeg arguments used by:
  *   - backend-local.js  (executes them via FFmpeg.wasm in the browser)
- *   - backend-remote.js (passes the job description to the Worker, which
- *                        dispatches edit.yml — the workflow mirrors this logic)
- *
- * Keep this in sync with .github/workflows/edit.yml.
+ *   - backend-remote.js (sends the built vf filter chain to the Worker,
+ *                        which passes it to edit.yml — no duplicate logic)
  */
 
 /**
@@ -38,6 +36,7 @@
  * @property {string[][]} trimCommands  - one arg array per clip (trim to intermediate MKV)
  * @property {string}     concatList    - contents of the ffconcat list file
  * @property {string[]}   finalCommand  - arg array for concat+transcode pass
+ * @property {string}     vf            - the complete -vf filter chain string
  */
 
 /**
@@ -118,7 +117,8 @@ export function buildFFmpegArgs(job, opts = {}) {
           + `:fontsize=36:fontcolor=white`
           + (opts.fontFile ? `:fontfile=${opts.fontFile}` : '')
           + `:x=(w-tw)/2:y=h-th-40`
-          + `:box=1:boxcolor=black@0.5:boxborderw=8`;
+          + `:box=1:boxcolor=black@0.5:boxborderw=8`
+          + `:text_align=C`;
       }
     }
   }
@@ -138,5 +138,6 @@ export function buildFFmpegArgs(job, opts = {}) {
     trimCommands,
     concatList: concatEntries.join('\n'),
     finalCommand,
+    vf,
   };
 }

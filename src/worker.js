@@ -328,7 +328,7 @@ async function handleEdit(request, env) {
   if (authErr) return authErr;
 
   const body = await request.json();
-  const { clips, output, force, overlays } = body;
+  const { clips, output, force, vf } = body;
 
   if (!clips || !Array.isArray(clips) || clips.length === 0) {
     return Response.json({ error: "No clips provided" }, { status: 400 });
@@ -343,6 +343,10 @@ async function handleEdit(request, env) {
     return Response.json({ error: "Invalid output path" }, { status: 400 });
   }
 
+  if (!vf || typeof vf !== 'string') {
+    return Response.json({ error: "No video filter chain provided" }, { status: 400 });
+  }
+
   for (const clip of clips) {
     if (!clip.key || !isValidKey(clip.key)) {
       return Response.json({ error: "Invalid clip key: " + clip.key }, { status: 400 });
@@ -352,23 +356,6 @@ async function handleEdit(request, env) {
     }
     if (typeof clip.end !== 'number' || (clip.end !== -1 && clip.end <= clip.start)) {
       return Response.json({ error: "Invalid end time for " + clip.key }, { status: 400 });
-    }
-  }
-
-  // Validate text overlays
-  const safeOverlays = [];
-  if (overlays && Array.isArray(overlays)) {
-    for (const ov of overlays) {
-      if (typeof ov.text !== 'string' || ov.text.trim().length === 0) continue;
-      if (typeof ov.start !== 'number' || ov.start < 0) {
-        return Response.json({ error: "Invalid overlay start time" }, { status: 400 });
-      }
-      if (typeof ov.end !== 'number' || ov.end <= ov.start) {
-        return Response.json({ error: "Invalid overlay end time" }, { status: 400 });
-      }
-      // Sanitize text for ffmpeg drawtext (escape special chars)
-      const safeText = ov.text.trim().replace(/\\/g, '\\\\\\\\').replace(/'/g, "\u2019").replace(/:/g, '\\\\:').replace(/%/g, '%%%%');
-      safeOverlays.push({ text: safeText, start: ov.start, end: ov.end });
     }
   }
 
@@ -390,7 +377,7 @@ async function handleEdit(request, env) {
     return Response.json({ error: "GITHUB_TOKEN not configured" }, { status: 500 });
   }
 
-  const editPayload = JSON.stringify({ clips, output: outputKey, overlays: safeOverlays });
+  const editPayload = JSON.stringify({ clips, output: outputKey, vf });
 
   try {
     const resp = await fetch(

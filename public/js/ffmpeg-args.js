@@ -96,8 +96,7 @@ export function buildFFmpegArgs(job, opts = {}) {
     const valid = job.overlays.filter(ov => ov.text.trim());
     if (valid.length) {
       const fontSize   = 36;
-      const boxBorderW = 3;
-      const lineH      = fontSize; // boxes overlap slightly — no visible gap
+      const boxBorderW = 8;
       const marginB    = 32;
 
       // Collect all unique boundary times
@@ -118,14 +117,16 @@ export function buildFFmpegArgs(job, opts = {}) {
             .replace(/'/g, '\u2019')
             .replace(/:/g, '\\\\:')
             .replace(/%/g, '%%%%');
-          // Stack bottom-to-top: line 0 = bottom, boxes touch with zero gap
-          const yOff = marginB + boxBorderW + fontSize + (n - 1 - li) * lineH;
+          // Stack bottom-to-top using th (actual rendered text height).
+          // boxborderw=8 ensures backdrops overlap to close any gap.
+          const revIdx = n - 1 - li;
+          const yExpr = `h-${marginB}-(${revIdx + 1})*th-(${2 * revIdx + 1})*${boxBorderW}`;
           vf += `,drawtext=text='${safeText}'`
             + `:enable='between(t,${segStart},${segEnd})'`
             + `:fontsize=${fontSize}:fontcolor=0x00f0c2`
             + `:box=1:boxcolor=0x1e1f29:boxborderw=${boxBorderW}`
             + (opts.fontFile ? `:fontfile=${opts.fontFile}` : '')
-            + `:x=(w-tw)/2:y=h-${yOff}`;
+            + `:x=(w-tw)/2:y=${yExpr}`;
         }
       }
     }

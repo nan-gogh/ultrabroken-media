@@ -95,11 +95,13 @@ export function buildFFmpegArgs(job, opts = {}) {
   if (job.overlays && job.overlays.length > 0) {
     const valid = job.overlays.filter(ov => ov.text.trim());
     if (valid.length) {
-      // fontsize proportional to height for consistent size across FFmpeg versions.
-      // boxborderw and marginB are fixed pixels — both pipelines scale to 720p
-      // so fixed values are safe, and FFmpeg 5.1.4 doesn't support expressions
-      // for boxborderw.
+      // All positioning uses h-based math so both FFmpeg versions compute
+      // identical values — no dependency on font rendering internals (th).
+      // fontsize=h/20 (36px@720p), lineH=h/16 (45px@720p, ~1.25× fontsize),
+      // boxborderw=8, marginB=32.  FFmpeg 5.1.4 doesn't support expressions
+      // for boxborderw so it stays as a fixed integer.
       const fontSizeExpr = 'h/20';
+      const lineHExpr    = 'h/16';   // replaces th — deterministic across versions
       const boxBorderW   = 8;
       const marginB      = 32;
 
@@ -121,10 +123,10 @@ export function buildFFmpegArgs(job, opts = {}) {
             .replace(/'/g, '\u2019')
             .replace(/:/g, '\\\\:')
             .replace(/%/g, '%%%%');
-          // Stack bottom-to-top using th (actual rendered text height).
+          // Stack bottom-to-top using deterministic h-based line height.
           // boxborderw=8 ensures backdrops overlap to close any gap.
           const revIdx = n - 1 - li;
-          const yExpr = `h-${marginB}-(${revIdx + 1})*th-(${2 * revIdx + 1})*${boxBorderW}`;
+          const yExpr = `h-${marginB}-(${revIdx + 1})*(${lineHExpr})-(${2 * revIdx + 1})*${boxBorderW}`;
           vf += `,drawtext=text='${safeText}'`
             + `:enable='between(t,${segStart},${segEnd})'`
             + `:fontsize=${fontSizeExpr}:fontcolor=0x00f0c2`

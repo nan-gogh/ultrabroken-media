@@ -56,7 +56,7 @@ export class RemoteBackend {
     const { vf, assContent } = buildFFmpegArgs(job, {
       preset: 'slow',
       fontFile: hasOverlays ? 'font.ttf' : undefined,
-      fontFamily: 'JetBrains Mono',
+      fontFamily: 'Texturina',
     });
     const payload = {
       clips: job.clips.map(c => ({ key: c.key, start: c.start, end: c.end })),

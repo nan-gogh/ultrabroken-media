@@ -109,7 +109,7 @@ jobs:
           echo "$EDIT_JSON" | jq -r '.assContent // empty' > subs.ass
 
           # Copy bundled font so libass can resolve it via fontsdir=.
-          cp public/js/vendor/font.ttf font.ttf
+          cp public/js/vendor/texturina.ttf font.ttf
 
           echo "VF=$VF"
 

@@ -137,14 +137,14 @@ export class LocalBackend {
     // Pre-load font for drawtext overlays (FFmpeg.wasm has no system fonts).
     const hasOverlays = job.overlays && job.overlays.length > 0;
     if (hasOverlays && !this._fontData) {
-      const fontUrl = new URL('../js/vendor/font.ttf', location.href).href;
+      const fontUrl = new URL('../js/vendor/texturina.ttf', location.href).href;
       this._fontData = await fetchFile(fontUrl);
     }
 
     const args = buildFFmpegArgs(job, {
       preset: 'medium',
       fontFile: hasOverlays ? 'font.ttf' : undefined,
-      fontFamily: 'JetBrains Mono',
+      fontFamily: 'Texturina',
     });
     this.onLog?.('[job] ' + args.trimCommands.length + ' clip(s) • ffmpeg ' + args.finalCommand.join(' '));
     const totalSteps  = args.trimCommands.length + 1;

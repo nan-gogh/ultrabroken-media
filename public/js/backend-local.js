@@ -132,28 +132,19 @@ export class LocalBackend {
     }
 
     const { fetchFile } = await loadModules();
-    const { buildFFmpegArgs, embedFontInAss } = await import('./ffmpeg-args.js');
+    const { buildFFmpegArgs } = await import('./ffmpeg-args.js');
 
-    // Pre-load font for ASS subtitle overlays (FFmpeg.wasm has no system fonts).
+    // Pre-load font for drawtext overlays (FFmpeg.wasm has no system fonts).
     const hasOverlays = job.overlays && job.overlays.length > 0;
     if (hasOverlays && !this._fontData) {
       const fontUrl = new URL('../js/vendor/texturina.ttf', location.href).href;
       this._fontData = await fetchFile(fontUrl);
     }
 
-    // Don't pass fontFile — local mode embeds the font directly in the ASS
-    // content rather than relying on fontsdir (which is unreliable in WASM).
     const args = buildFFmpegArgs(job, {
       preset: 'medium',
-      fontFamily: 'Texturina',
+      fontFile: hasOverlays ? 'font.ttf' : undefined,
     });
-
-    // Embed font in ASS so libass finds it without filesystem scanning.
-    if (args.assContent && this._fontData) {
-      args.assContent = embedFontInAss(
-        args.assContent, 'texturina.ttf', new Uint8Array(this._fontData),
-      );
-    }
     this.onLog?.('[job] ' + args.trimCommands.length + ' clip(s) • ffmpeg ' + args.finalCommand.join(' '));
     const totalSteps  = args.trimCommands.length + 1;
     let   stepsDone   = 0;
@@ -179,10 +170,10 @@ export class LocalBackend {
     const writtenFiles = [];
 
     try {
-      // 1. Write ASS subtitle file if overlays generated one.
-      if (args.assContent) {
-        await this.ffmpeg.writeFile('subs.ass', args.assContent);
-        writtenFiles.push('subs.ass');
+      // 1. Write font to VFS if needed for drawtext overlays.
+      if (hasOverlays) {
+        await this.ffmpeg.writeFile('font.ttf', new Uint8Array(this._fontData));
+        writtenFiles.push('font.ttf');
       }
 
       // 2. Write each source clip into the FFmpeg virtual FS.

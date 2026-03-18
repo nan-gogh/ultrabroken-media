@@ -37,7 +37,6 @@
  * @property {string}     concatList    - contents of the ffconcat list file
  * @property {string[]}   finalCommand  - arg array for concat+transcode pass
  * @property {string}     vf            - the complete -vf filter chain string
- * @property {string|null} assContent   - ASS subtitle file content (null when no overlays)
  */
 
 /**
@@ -47,14 +46,10 @@
  *   'slow' for maximum quality. Local (browser) mode defaults to 'medium' to
  *   keep processing time tolerable while still producing good output.
  * @property {string} [fontFile]
- *   When set, the ASS subtitle filter includes fontsdir=. so libass can find
- *   the font file in the FFmpeg virtual FS (which has no system fonts).
+ *   Path to a font file in the FFmpeg virtual FS (or working directory for
+ *   remote).  Used in drawtext's fontfile= option.  FFmpeg.wasm has no
+ *   system fonts, so this is required for overlay text.
  *   Example: `'font.ttf'` (written to the VFS root before encode).
- * @property {string} [fontFamily='Arial']
- *   Font family name to use in the ASS style.  Must match the internal family
- *   name of the font at `fontFile` when running in FFmpeg.wasm (which has no
- *   system fonts).  Defaults to 'Arial' for remote/Actions where system fonts
- *   are available.
  */
 
 /**
@@ -97,13 +92,42 @@ export function buildFFmpegArgs(job, opts = {}) {
   // ── Build video filter chain ────────────────────────────────────────────
   let vf = "setpts=PTS-STARTPTS,scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease";
 
-  let assContent = null;
-
   if (job.overlays && job.overlays.length > 0) {
     const valid = job.overlays.filter(ov => ov.text.trim());
     if (valid.length) {
-      assContent = buildAssContent(valid, opts.fontFamily || 'Arial');
-      vf += ',subtitles=subs.ass' + (opts.fontFile ? ':fontsdir=.' : '');
+      const fontSize   = 36;
+      const boxBorderW = 3;
+      const lineH      = fontSize + 2 * boxBorderW; // 42px — boxes touch
+      const marginB    = 32;
+
+      // Collect all unique boundary times
+      const times = new Set();
+      for (const ov of valid) { times.add(ov.start); times.add(ov.end); }
+      const boundaries = [...times].sort((a, b) => a - b);
+
+      for (let i = 0; i < boundaries.length - 1; i++) {
+        const segStart = boundaries[i];
+        const segEnd   = boundaries[i + 1];
+        const active = valid.filter(ov => ov.start <= segStart && ov.end >= segEnd);
+        if (!active.length) continue;
+
+        const n = active.length;
+        for (let li = 0; li < n; li++) {
+          const safeText = active[li].text.trim()
+            .replace(/\\/g, '\\\\\\\\')
+            .replace(/'/g, '\u2019')
+            .replace(/:/g, '\\\\:')
+            .replace(/%/g, '%%%%');
+          // Stack bottom-to-top: line 0 = bottom, boxes touch with zero gap
+          const yOff = marginB + boxBorderW + fontSize + (n - 1 - li) * lineH;
+          vf += `,drawtext=text='${safeText}'`
+            + `:enable='between(t,${segStart},${segEnd})'`
+            + `:fontsize=${fontSize}:fontcolor=0x00f0c2`
+            + `:box=1:boxcolor=0x1e1f29@0.5:boxborderw=${boxBorderW}`
+            + (opts.fontFile ? `:fontfile=${opts.fontFile}` : '')
+            + `:x=(w-tw)/2:y=h-${yOff}`;
+        }
+      }
     }
   }
 
@@ -123,118 +147,5 @@ export function buildFFmpegArgs(job, opts = {}) {
     concatList: concatEntries.join('\n'),
     finalCommand,
     vf,
-    assContent,
   };
-}
-
-// ── ASS subtitle helpers ──────────────────────────────────────────────────
-
-/** Convert seconds to ASS time format (H:MM:SS.cc). */
-function toAssTime(seconds) {
-  const h  = Math.floor(seconds / 3600);
-  const m  = Math.floor((seconds % 3600) / 60);
-  const s  = Math.floor(seconds % 60);
-  const cs = Math.round((seconds % 1) * 100);
-  return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
-}
-
-/**
- * Build an ASS subtitle file from overlay definitions.
- *
- * Uses BorderStyle=3 (opaque box) with 50% transparent black background,
- * centered white text (Alignment=2), and bottom margin matching the previous
- * drawtext layout.  Overlapping time ranges are merged into single Dialogue
- * lines joined with \N (hard line break) so they share one background box.
- *
- * @param {Overlay[]} overlays - non-empty, already filtered for blank text
- * @param {string} fontFamily - font family name for the ASS style
- * @returns {string} complete ASS file content
- */
-function buildAssContent(overlays, fontFamily) {
-  const header =
-`[Script Info]
-ScriptType: v4.00+
-PlayResX: 1280
-PlayResY: 720
-WrapStyle: 0
-
-[V4+ Styles]
-Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,${fontFamily},36,&H00C2F000,&H000000FF,&H00000000,&H80291F1E,0,0,0,0,100,100,0,0,3,3,0,2,10,10,32,1
-
-[Events]
-Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text`;
-
-  // Split overlapping time ranges at boundary points so each segment
-  // gets a single Dialogue line with all active text joined by \N.
-  const times = new Set();
-  for (const ov of overlays) { times.add(ov.start); times.add(ov.end); }
-  const boundaries = [...times].sort((a, b) => a - b);
-
-  const dialogues = [];
-  for (let i = 0; i < boundaries.length - 1; i++) {
-    const segStart = boundaries[i];
-    const segEnd   = boundaries[i + 1];
-    const active = overlays.filter(ov => ov.start <= segStart && ov.end >= segEnd);
-    if (!active.length) continue;
-
-    const text = active.map(ov => ov.text.trim()).join('\\N');
-    dialogues.push(
-      `Dialogue: 0,${toAssTime(segStart)},${toAssTime(segEnd)},Default,,0,0,0,,${text}`
-    );
-  }
-
-  return header + '\n' + dialogues.join('\n') + '\n';
-}
-
-/**
- * Embed a font file into an ASS subtitle string using the [Fonts] section.
- *
- * libass reads embedded fonts directly from the ASS content, which is the
- * most reliable way to supply a custom font in environments where fontsdir
- * scanning may not work (e.g. Emscripten / FFmpeg.wasm VFS).
- *
- * The encoding matches the SSA/ASS spec: 3 input bytes → 4 output chars,
- * each a 6-bit value + 33.
- *
- * @param {string} assContent - the ASS file content (from buildAssContent)
- * @param {string} fontFilename - filename label (e.g. 'texturina.ttf')
- * @param {Uint8Array} fontData - raw font bytes
- * @returns {string} assContent with [Fonts] section inserted before [Events]
- */
-export function embedFontInAss(assContent, fontFilename, fontData) {
-  let encoded = '';
-  let line = '';
-  for (let i = 0; i < fontData.length; i += 3) {
-    const remaining = fontData.length - i;
-    const b0 = fontData[i];
-    const b1 = remaining > 1 ? fontData[i + 1] : 0;
-    const b2 = remaining > 2 ? fontData[i + 2] : 0;
-    const c0 = String.fromCharCode((b0 >> 2) + 33);
-    const c1 = String.fromCharCode((((b0 & 3) << 4) | (b1 >> 4)) + 33);
-    const c2 = String.fromCharCode((((b1 & 0xF) << 2) | (b2 >> 6)) + 33);
-    const c3 = String.fromCharCode((b2 & 0x3F) + 33);
-    // Last group: truncate chars to remaining+1 so libass decodes
-    // the correct byte count (1 byte→2 chars, 2→3, 3→4).
-    const chars = remaining >= 3 ? 4 : remaining + 1;
-    line += (c0 + c1 + c2 + c3).slice(0, chars);
-    if (line.length >= 80) {
-      encoded += line + '\n';
-      line = '';
-    }
-  }
-  if (line) encoded += line + '\n';
-
-  const fontsBlock = '\n[Fonts]\nfontname: ' + fontFilename + '\n' + encoded;
-
-  // Insert [Fonts] BEFORE [Events] — FFmpeg's subtitles filter reads ASS
-  // through avformat, which only treats content before [Events] as the
-  // header.  Anything after [Events] is ignored (only Dialogue lines are
-  // read as packets), so [Fonts] must come first.
-  const eventsIdx = assContent.indexOf('\n[Events]');
-  if (eventsIdx !== -1) {
-    return assContent.slice(0, eventsIdx) + fontsBlock + assContent.slice(eventsIdx);
-  }
-  // Fallback: append if [Events] not found (shouldn't happen)
-  return assContent + fontsBlock;
 }

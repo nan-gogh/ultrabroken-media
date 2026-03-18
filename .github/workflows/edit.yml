@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       edit:
-        description: 'JSON: {"clips":[...], "output":"...", "vf":"...", "assContent":"..."}'
+        description: 'JSON: {"clips":[...], "output":"...", "vf":"..."}'
         required: true
         type: string
 
@@ -105,10 +105,7 @@ jobs:
           # Video filter chain is built client-side by ffmpeg-args.js (single source of truth)
           VF=$(echo "$EDIT_JSON" | jq -r '.vf')
 
-          # Write ASS subtitle file if overlays are present
-          echo "$EDIT_JSON" | jq -r '.assContent // empty' > subs.ass
-
-          # Copy bundled font so libass can resolve it via fontsdir=.
+          # Copy bundled font for drawtext overlays
           cp public/js/vendor/texturina.ttf font.ttf
 
           echo "VF=$VF"
@@ -131,6 +128,6 @@ jobs:
           echo "Uploaded: $OUTPUT_KEY"
 
           # Cleanup
-          rm -f trimmed_*.mkv concat_list.txt subs.ass output.mp4
+          rm -f trimmed_*.mkv concat_list.txt font.ttf output.mp4
           echo ""
           echo "=== Edit complete ==="

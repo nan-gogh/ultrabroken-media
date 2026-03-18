@@ -328,7 +328,7 @@ async function handleEdit(request, env) {
   if (authErr) return authErr;
 
   const body = await request.json();
-  const { clips, output, force, vf, assContent } = body;
+  const { clips, output, force, vf } = body;
 
   if (!clips || !Array.isArray(clips) || clips.length === 0) {
     return Response.json({ error: "No clips provided" }, { status: 400 });
@@ -377,7 +377,7 @@ async function handleEdit(request, env) {
     return Response.json({ error: "GITHUB_TOKEN not configured" }, { status: 500 });
   }
 
-  const editPayload = JSON.stringify({ clips, output: outputKey, vf, ...(assContent ? { assContent } : {}) });
+  const editPayload = JSON.stringify({ clips, output: outputKey, vf });
 
   try {
     const resp = await fetch(

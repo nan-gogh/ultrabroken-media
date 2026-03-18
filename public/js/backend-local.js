@@ -176,6 +176,12 @@ export class LocalBackend {
         writtenFiles.push('font.ttf');
       }
 
+      // 1b. Write ASS subtitle file if overlays generated one.
+      if (args.assContent) {
+        await this.ffmpeg.writeFile('subs.ass', args.assContent);
+        writtenFiles.push('subs.ass');
+      }
+
       // 2. Write each source clip into the FFmpeg virtual FS.
       for (const [i, clip] of job.clips.entries()) {
         onProgress?.(stepsDone / totalSteps, `Loading clip ${i + 1}/${job.clips.length}…`);

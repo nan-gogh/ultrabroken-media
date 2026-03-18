@@ -52,10 +52,11 @@ export class RemoteBackend {
    * @returns {Promise<{ok: boolean, output?: string, error?: string}>}
    */
   async execute(job) {
-    const { vf } = buildFFmpegArgs(job, { preset: 'slow' });
+    const { vf, assContent } = buildFFmpegArgs(job, { preset: 'slow' });
     const payload = {
       clips: job.clips.map(c => ({ key: c.key, start: c.start, end: c.end })),
       vf,
+      ...(assContent ? { assContent } : {}),
       output: job.outputKey,
       force: job.force || false,
     };

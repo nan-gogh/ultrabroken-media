@@ -37,6 +37,7 @@
  * @property {string}     concatList    - contents of the ffconcat list file
  * @property {string[]}   finalCommand  - arg array for concat+transcode pass
  * @property {string}     vf            - the complete -vf filter chain string
+ * @property {string|null} assContent   - ASS subtitle file content (null when no overlays)
  */
 
 /**
@@ -46,8 +47,8 @@
  *   'slow' for maximum quality. Local (browser) mode defaults to 'medium' to
  *   keep processing time tolerable while still producing good output.
  * @property {string} [fontFile]
- *   Path to a font file in the FFmpeg virtual FS to use for drawtext overlays.
- *   Required when running inside FFmpeg.wasm, which has no system fonts.
+ *   When set, the ASS subtitle filter includes fontsdir=. so libass can find
+ *   the font file in the FFmpeg virtual FS (which has no system fonts).
  *   Example: `'font.ttf'` (written to the VFS root before encode).
  */
 
@@ -91,52 +92,13 @@ export function buildFFmpegArgs(job, opts = {}) {
   // ── Build video filter chain ────────────────────────────────────────────
   let vf = "setpts=PTS-STARTPTS,scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease";
 
+  let assContent = null;
+
   if (job.overlays && job.overlays.length > 0) {
-    // Build time-segment overlay filters: one drawbox for a unified
-    // background, then one drawtext per active line (independently centered).
-    // Avoids \n joining (stray glyph risk) and text_align (FFmpeg 6.0+).
     const valid = job.overlays.filter(ov => ov.text.trim());
     if (valid.length) {
-      const fontSize = 36;
-      const lineGap  = 8;
-      const lineH    = fontSize + lineGap;    // 44px per line step
-      const padV     = 8;                     // vertical padding inside box
-      const marginB  = 32;                    // margin from frame bottom
-
-      // Collect all unique boundary times
-      const times = new Set();
-      for (const ov of valid) { times.add(ov.start); times.add(ov.end); }
-      const boundaries = [...times].sort((a, b) => a - b);
-
-      for (let i = 0; i < boundaries.length - 1; i++) {
-        const segStart = boundaries[i];
-        const segEnd   = boundaries[i + 1];
-        const active = valid.filter(ov => ov.start <= segStart && ov.end >= segEnd);
-        if (!active.length) continue;
-
-        const n = active.length;
-        const boxH = n * fontSize + (n - 1) * lineGap + 2 * padV;
-
-        // Unified background box (70% of frame width, centered)
-        vf += `,drawbox=enable='between(t,${segStart},${segEnd})'`
-          + `:x=iw*0.15:y=ih-${boxH + marginB}:w=iw*0.7:h=${boxH}`
-          + `:color=black@0.5:t=fill`;
-
-        // Individual text lines, centered, stacked bottom-to-top
-        for (let li = 0; li < n; li++) {
-          const safeText = active[li].text.trim()
-            .replace(/\\/g, '\\\\\\\\')
-            .replace(/'/g, '\u2019')
-            .replace(/:/g, '\\\\:')
-            .replace(/%/g, '%%%%');
-          const yFromBottom = marginB + padV + (n - 1 - li) * lineH;
-          vf += `,drawtext=text='${safeText}'`
-            + `:enable='between(t,${segStart},${segEnd})'`
-            + `:fontsize=${fontSize}:fontcolor=white`
-            + (opts.fontFile ? `:fontfile=${opts.fontFile}` : '')
-            + `:x=(w-tw)/2:y=h-th-${yFromBottom}`;
-        }
-      }
+      assContent = buildAssContent(valid);
+      vf += ',ass=subs.ass' + (opts.fontFile ? ':fontsdir=.' : '');
     }
   }
 
@@ -156,5 +118,65 @@ export function buildFFmpegArgs(job, opts = {}) {
     concatList: concatEntries.join('\n'),
     finalCommand,
     vf,
+    assContent,
   };
+}
+
+// ── ASS subtitle helpers ──────────────────────────────────────────────────
+
+/** Convert seconds to ASS time format (H:MM:SS.cc). */
+function toAssTime(seconds) {
+  const h  = Math.floor(seconds / 3600);
+  const m  = Math.floor((seconds % 3600) / 60);
+  const s  = Math.floor(seconds % 60);
+  const cs = Math.round((seconds % 1) * 100);
+  return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
+}
+
+/**
+ * Build an ASS subtitle file from overlay definitions.
+ *
+ * Uses BorderStyle=3 (opaque box) with 50% transparent black background,
+ * centered white text (Alignment=2), and bottom margin matching the previous
+ * drawtext layout.  Overlapping time ranges are merged into single Dialogue
+ * lines joined with \N (hard line break) so they share one background box.
+ *
+ * @param {Overlay[]} overlays - non-empty, already filtered for blank text
+ * @returns {string} complete ASS file content
+ */
+function buildAssContent(overlays) {
+  const header =
+`[Script Info]
+ScriptType: v4.00+
+PlayResX: 1280
+PlayResY: 720
+WrapStyle: 0
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,36,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,3,8,0,2,10,10,32,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text`;
+
+  // Split overlapping time ranges at boundary points so each segment
+  // gets a single Dialogue line with all active text joined by \N.
+  const times = new Set();
+  for (const ov of overlays) { times.add(ov.start); times.add(ov.end); }
+  const boundaries = [...times].sort((a, b) => a - b);
+
+  const dialogues = [];
+  for (let i = 0; i < boundaries.length - 1; i++) {
+    const segStart = boundaries[i];
+    const segEnd   = boundaries[i + 1];
+    const active = overlays.filter(ov => ov.start <= segStart && ov.end >= segEnd);
+    if (!active.length) continue;
+
+    const text = active.map(ov => ov.text.trim()).join('\\N');
+    dialogues.push(
+      `Dialogue: 0,${toAssTime(segStart)},${toAssTime(segEnd)},Default,,0,0,0,,${text}`
+    );
+  }
+
+  return header + '\n' + dialogues.join('\n') + '\n';
 }

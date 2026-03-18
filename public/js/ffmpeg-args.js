@@ -160,7 +160,7 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,${fontFamily},36,&H00C2F000,&H000000FF,&H00000000,&H8017110F,0,0,0,0,100,100,0,0,3,3,0,2,10,10,32,1
+Style: Default,${fontFamily},36,&H00C2F000,&H000000FF,&H00000000,&H80291F1E,0,0,0,0,100,100,0,0,3,3,0,2,10,10,32,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text`;
@@ -185,4 +185,42 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text`
   }
 
   return header + '\n' + dialogues.join('\n') + '\n';
+}
+
+/**
+ * Embed a font file into an ASS subtitle string using the [Fonts] section.
+ *
+ * libass reads embedded fonts directly from the ASS content, which is the
+ * most reliable way to supply a custom font in environments where fontsdir
+ * scanning may not work (e.g. Emscripten / FFmpeg.wasm VFS).
+ *
+ * The encoding matches the SSA/ASS spec: 3 input bytes → 4 output chars,
+ * each a 6-bit value + 33.
+ *
+ * @param {string} assContent - the ASS file content (from buildAssContent)
+ * @param {string} fontFilename - filename label (e.g. 'texturina.ttf')
+ * @param {Uint8Array} fontData - raw font bytes
+ * @returns {string} assContent with [Fonts] section appended
+ */
+export function embedFontInAss(assContent, fontFilename, fontData) {
+  let encoded = '';
+  let line = '';
+  for (let i = 0; i < fontData.length; i += 3) {
+    const b0 = fontData[i];
+    const b1 = i + 1 < fontData.length ? fontData[i + 1] : 0;
+    const b2 = i + 2 < fontData.length ? fontData[i + 2] : 0;
+    line += String.fromCharCode(
+      (b0 >> 2) + 33,
+      (((b0 & 3) << 4) | (b1 >> 4)) + 33,
+      (((b1 & 0xF) << 2) | (b2 >> 6)) + 33,
+      (b2 & 0x3F) + 33,
+    );
+    if (line.length >= 80) {
+      encoded += line + '\n';
+      line = '';
+    }
+  }
+  if (line) encoded += line + '\n';
+
+  return assContent + '\n[Fonts]\nfontname: ' + fontFilename + '\n' + encoded;
 }

@@ -97,7 +97,7 @@ export function buildFFmpegArgs(job, opts = {}) {
     if (valid.length) {
       const fontSize   = 36;
       const boxBorderW = 3;
-      const lineH      = fontSize + 2 * boxBorderW; // 42px — boxes touch
+      const lineH      = fontSize; // boxes overlap slightly — no visible gap
       const marginB    = 32;
 
       // Collect all unique boundary times
@@ -123,7 +123,7 @@ export function buildFFmpegArgs(job, opts = {}) {
           vf += `,drawtext=text='${safeText}'`
             + `:enable='between(t,${segStart},${segEnd})'`
             + `:fontsize=${fontSize}:fontcolor=0x00f0c2`
-            + `:box=1:boxcolor=0x1e1f29@0.5:boxborderw=${boxBorderW}`
+            + `:box=1:boxcolor=0x1e1f29:boxborderw=${boxBorderW}`
             + (opts.fontFile ? `:fontfile=${opts.fontFile}` : '')
             + `:x=(w-tw)/2:y=h-${yOff}`;
         }

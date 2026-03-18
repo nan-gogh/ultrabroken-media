@@ -94,6 +94,8 @@ export function buildFFmpegArgs(job, opts = {}) {
   if (job.overlays && job.overlays.length > 0) {
     // Build time-segment drawtext filters so the text box content
     // changes dynamically as individual overlays enter/exit.
+    // Each active overlay gets its own drawtext filter, independently
+    // centered via x=(w-tw)/2 and stacked vertically from the bottom.
     const valid = job.overlays.filter(ov => ov.text.trim());
     if (valid.length) {
       // Collect all unique boundary times
@@ -101,24 +103,28 @@ export function buildFFmpegArgs(job, opts = {}) {
       for (const ov of valid) { times.add(ov.start); times.add(ov.end); }
       const boundaries = [...times].sort((a, b) => a - b);
 
-      // For each segment, collect active overlay texts
+      // For each segment, emit one drawtext per active overlay
       for (let i = 0; i < boundaries.length - 1; i++) {
         const segStart = boundaries[i];
         const segEnd   = boundaries[i + 1];
         const active = valid.filter(ov => ov.start <= segStart && ov.end >= segEnd);
         if (!active.length) continue;
-        const safeText = active.map(ov => ov.text.trim()).join('\n')
-          .replace(/\\/g, '\\\\\\\\')
-          .replace(/'/g, '\u2019')
-          .replace(/:/g, '\\\\:')
-          .replace(/%/g, '%%%%');
-        vf += `,drawtext=text='${safeText}'`
-          + `:enable='between(t,${segStart},${segEnd})'`
-          + `:fontsize=36:fontcolor=white`
-          + (opts.fontFile ? `:fontfile=${opts.fontFile}` : '')
-          + `:x=(w-tw)/2:y=h-th-40`
-          + `:box=1:boxcolor=black@0.5:boxborderw=8`
-          + `:text_align=C`;
+
+        for (let li = 0; li < active.length; li++) {
+          const safeText = active[li].text.trim()
+            .replace(/\\/g, '\\\\\\\\')
+            .replace(/'/g, '\u2019')
+            .replace(/:/g, '\\\\:')
+            .replace(/%/g, '%%%%');
+          // Stack from bottom: last overlay at y=h-th-40, earlier ones above
+          const yOffset = (active.length - 1 - li) * 52; // 36 font + 16 box padding
+          vf += `,drawtext=text='${safeText}'`
+            + `:enable='between(t,${segStart},${segEnd})'`
+            + `:fontsize=36:fontcolor=white`
+            + (opts.fontFile ? `:fontfile=${opts.fontFile}` : '')
+            + `:x=(w-tw)/2:y=h-th-${40 + yOffset}`
+            + `:box=1:boxcolor=black@0.5:boxborderw=8`;
+        }
       }
     }
   }

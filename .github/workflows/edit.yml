@@ -108,6 +108,9 @@ jobs:
           # Write ASS subtitle file if overlays are present
           echo "$EDIT_JSON" | jq -r '.assContent // empty' > subs.ass
 
+          # Copy bundled font so libass can resolve it via fontsdir=.
+          cp public/js/vendor/font.ttf font.ttf
+
           echo "VF=$VF"
 
           ffmpeg -f concat -safe 0 -i concat_list.txt \

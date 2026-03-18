@@ -50,6 +50,11 @@
  *   When set, the ASS subtitle filter includes fontsdir=. so libass can find
  *   the font file in the FFmpeg virtual FS (which has no system fonts).
  *   Example: `'font.ttf'` (written to the VFS root before encode).
+ * @property {string} [fontFamily='Arial']
+ *   Font family name to use in the ASS style.  Must match the internal family
+ *   name of the font at `fontFile` when running in FFmpeg.wasm (which has no
+ *   system fonts).  Defaults to 'Arial' for remote/Actions where system fonts
+ *   are available.
  */
 
 /**
@@ -97,7 +102,7 @@ export function buildFFmpegArgs(job, opts = {}) {
   if (job.overlays && job.overlays.length > 0) {
     const valid = job.overlays.filter(ov => ov.text.trim());
     if (valid.length) {
-      assContent = buildAssContent(valid);
+      assContent = buildAssContent(valid, opts.fontFamily || 'Arial');
       vf += ',ass=subs.ass' + (opts.fontFile ? ':fontsdir=.' : '');
     }
   }
@@ -142,9 +147,10 @@ function toAssTime(seconds) {
  * lines joined with \N (hard line break) so they share one background box.
  *
  * @param {Overlay[]} overlays - non-empty, already filtered for blank text
+ * @param {string} fontFamily - font family name for the ASS style
  * @returns {string} complete ASS file content
  */
-function buildAssContent(overlays) {
+function buildAssContent(overlays, fontFamily) {
   const header =
 `[Script Info]
 ScriptType: v4.00+
@@ -154,7 +160,7 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,36,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,3,8,0,2,10,10,32,1
+Style: Default,${fontFamily},36,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,3,8,0,2,10,10,32,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text`;

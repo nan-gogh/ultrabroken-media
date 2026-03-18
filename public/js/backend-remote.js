@@ -52,7 +52,12 @@ export class RemoteBackend {
    * @returns {Promise<{ok: boolean, output?: string, error?: string}>}
    */
   async execute(job) {
-    const { vf, assContent } = buildFFmpegArgs(job, { preset: 'slow' });
+    const hasOverlays = job.overlays && job.overlays.some(o => o.text.trim());
+    const { vf, assContent } = buildFFmpegArgs(job, {
+      preset: 'slow',
+      fontFile: hasOverlays ? 'font.ttf' : undefined,
+      fontFamily: 'JetBrains Mono',
+    });
     const payload = {
       clips: job.clips.map(c => ({ key: c.key, start: c.start, end: c.end })),
       vf,

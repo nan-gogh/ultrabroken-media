@@ -92,38 +92,49 @@ export function buildFFmpegArgs(job, opts = {}) {
   let vf = "setpts=PTS-STARTPTS,scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease";
 
   if (job.overlays && job.overlays.length > 0) {
-    // Build time-segment drawtext filters so the text box content
-    // changes dynamically as individual overlays enter/exit.
-    // Each active overlay gets its own drawtext filter, independently
-    // centered via x=(w-tw)/2 and stacked vertically from the bottom.
+    // Build time-segment overlay filters: one drawbox for a unified
+    // background, then one drawtext per active line (independently centered).
+    // Avoids \n joining (stray glyph risk) and text_align (FFmpeg 6.0+).
     const valid = job.overlays.filter(ov => ov.text.trim());
     if (valid.length) {
+      const fontSize = 36;
+      const lineGap  = 8;
+      const lineH    = fontSize + lineGap;    // 44px per line step
+      const padV     = 8;                     // vertical padding inside box
+      const marginB  = 32;                    // margin from frame bottom
+
       // Collect all unique boundary times
       const times = new Set();
       for (const ov of valid) { times.add(ov.start); times.add(ov.end); }
       const boundaries = [...times].sort((a, b) => a - b);
 
-      // For each segment, emit one drawtext per active overlay
       for (let i = 0; i < boundaries.length - 1; i++) {
         const segStart = boundaries[i];
         const segEnd   = boundaries[i + 1];
         const active = valid.filter(ov => ov.start <= segStart && ov.end >= segEnd);
         if (!active.length) continue;
 
-        for (let li = 0; li < active.length; li++) {
+        const n = active.length;
+        const boxH = n * fontSize + (n - 1) * lineGap + 2 * padV;
+
+        // Unified background box (70% of frame width, centered)
+        vf += `,drawbox=enable='between(t,${segStart},${segEnd})'`
+          + `:x=iw*0.15:y=ih-${boxH + marginB}:w=iw*0.7:h=${boxH}`
+          + `:color=black@0.5:t=fill`;
+
+        // Individual text lines, centered, stacked bottom-to-top
+        for (let li = 0; li < n; li++) {
           const safeText = active[li].text.trim()
             .replace(/\\/g, '\\\\\\\\')
             .replace(/'/g, '\u2019')
             .replace(/:/g, '\\\\:')
             .replace(/%/g, '%%%%');
-          // Stack from bottom: last overlay at y=h-th-40, earlier ones above
-          const yOffset = (active.length - 1 - li) * 52; // 36 font + 16 box padding
+          const yFromBottom = marginB + padV + (n - 1 - li) * lineH;
           vf += `,drawtext=text='${safeText}'`
             + `:enable='between(t,${segStart},${segEnd})'`
-            + `:fontsize=36:fontcolor=white`
+            + `:fontsize=${fontSize}:fontcolor=white`
             + (opts.fontFile ? `:fontfile=${opts.fontFile}` : '')
-            + `:x=(w-tw)/2:y=h-th-${40 + yOffset}`
-            + `:box=1:boxcolor=black@0.5:boxborderw=8`;
+            + `:x=(w-tw)/2:y=h-th-${yFromBottom}`;
         }
       }
     }

@@ -200,7 +200,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text`
  * @param {string} assContent - the ASS file content (from buildAssContent)
  * @param {string} fontFilename - filename label (e.g. 'texturina.ttf')
  * @param {Uint8Array} fontData - raw font bytes
- * @returns {string} assContent with [Fonts] section appended
+ * @returns {string} assContent with [Fonts] section inserted before [Events]
  */
 export function embedFontInAss(assContent, fontFilename, fontData) {
   let encoded = '';
@@ -225,5 +225,16 @@ export function embedFontInAss(assContent, fontFilename, fontData) {
   }
   if (line) encoded += line + '\n';
 
-  return assContent + '\n[Fonts]\nfontname: ' + fontFilename + '\n' + encoded;
+  const fontsBlock = '\n[Fonts]\nfontname: ' + fontFilename + '\n' + encoded;
+
+  // Insert [Fonts] BEFORE [Events] — FFmpeg's subtitles filter reads ASS
+  // through avformat, which only treats content before [Events] as the
+  // header.  Anything after [Events] is ignored (only Dialogue lines are
+  // read as packets), so [Fonts] must come first.
+  const eventsIdx = assContent.indexOf('\n[Events]');
+  if (eventsIdx !== -1) {
+    return assContent.slice(0, eventsIdx) + fontsBlock + assContent.slice(eventsIdx);
+  }
+  // Fallback: append if [Events] not found (shouldn't happen)
+  return assContent + fontsBlock;
 }

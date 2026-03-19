@@ -598,7 +598,7 @@ const MANAGE_HTML = `<!DOCTYPE html>
 <div class="upload-zone" id="dropzone">
   <p><strong>Drop files here</strong> or click to browse</p>
   <input type="checkbox" id="compressToggle" hidden>
-  <div id="compressArea" style="opacity:0.3;cursor:pointer;user-select:none" onclick="(function(ev){
+  <div id="compressArea" style="display:inline-block;opacity:0.3;cursor:pointer;user-select:none" onclick="(function(ev){
     ev.stopPropagation();
     var cb=document.getElementById('compressToggle');
     cb.checked=!cb.checked;

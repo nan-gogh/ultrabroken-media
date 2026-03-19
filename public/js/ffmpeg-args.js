@@ -95,12 +95,11 @@ export function buildFFmpegArgs(job, opts = {}) {
   if (job.overlays && job.overlays.length > 0) {
     const valid = job.overlays.filter(ov => ov.text.trim());
     if (valid.length) {
-      // fontsize=h/20 for version-consistent sizing.  Y positioning uses th
-      // (actual rendered text height) so boxes always touch regardless of
-      // FFmpeg/FreeType version.  boxborderw=8 ensures backdrops overlap.
+      // fontsize=h/20 for version-consistent sizing.  Bottom line's backdrop
+      // is flush with the frame bottom edge.  Lines stack upward using th.
+      // boxborderw=8 ensures backdrops overlap between lines.
       const fontSizeExpr = 'h/20';
       const boxBorderW   = 8;
-      const marginB      = 32;
 
       // Collect all unique boundary times
       const times = new Set();
@@ -120,10 +119,11 @@ export function buildFFmpegArgs(job, opts = {}) {
             .replace(/'/g, '\u2019')
             .replace(/:/g, '\\\\:')
             .replace(/%/g, '%%%%');
-          // Stack bottom-to-top using th (actual rendered text height).
-          // boxborderw=8 ensures backdrops overlap to close any gap.
+          // Bottom-aligned: revIdx 0 = bottom line flush with frame edge.
+          // y = h - th - boxBorderW  places bottom box edge at h.
+          // Each line above: subtract (th + 2*boxBorderW) per step.
           const revIdx = n - 1 - li;
-          const yExpr = `h-${marginB}-(${revIdx + 1})*th-(${2 * revIdx + 1})*${boxBorderW}`;
+          const yExpr = `h-th-${boxBorderW}-${revIdx}*(th+${2 * boxBorderW})`;
           vf += `,drawtext=text='${safeText}'`
             + `:enable='between(t,${segStart},${segEnd})'`
             + `:fontsize=${fontSizeExpr}:fontcolor=0x00f0c2`

@@ -21,10 +21,11 @@ social/    → Social card PNGs
 
 | | URL |
 |---|---|
-| **Public R2 browser** | [`nan-gogh.github.io/ultrabroken-media/`](https://nan-gogh.github.io/ultrabroken-media/) |
+| **Media Portal** | [`nan-gogh.github.io/ultrabroken-media/`](https://nan-gogh.github.io/ultrabroken-media/) |
+| **Public R2 browser** | [`nan-gogh.github.io/ultrabroken-media/browser/`](https://nan-gogh.github.io/ultrabroken-media/browser/) |
 | **Local video editor** | [`nan-gogh.github.io/ultrabroken-media/editor/`](https://nan-gogh.github.io/ultrabroken-media/editor/) |
 
-Both are static GitHub Pages — no login, no upload, no server calls. The local editor runs entirely in-browser via FFmpeg.wasm.
+All are static GitHub Pages — no login, no upload, no server calls. The portal is a gateway that links to both public and authenticated interfaces. The local editor runs entirely in-browser via FFmpeg.wasm.
 
 ## Authenticated Interfaces (GitHub OAuth via Cloudflare Access)
 

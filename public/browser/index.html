@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ultrabroken Archives — Media Vault</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=New+Rocker&family=Texturina:ital,opsz,wght@0,12..44,100..900;1,12..44,100..900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/vault.css">
+</head>
+<body>
+
+<header>
+  <h1>Ultrabroken Archives <span class="sub">Media Vault</span></h1>
+  <a class="btn" href="../editor/">Video Editor</a>
+</header>
+
+<div id="status"></div>
+
+<div class="tabs">
+  <button class="active" onclick="switchTab('image/')">image/</button>
+  <button onclick="switchTab('video/')">video/</button>
+  <button onclick="switchTab('social/')">social/</button>
+</div>
+
+<div id="fileListContainer">
+  <div class="loading">Loading&hellip;</div>
+</div>
+
+<script>
+const WORKER = 'https://ultrabroken-media.gl1tchcr4vt.workers.dev';
+let currentPrefix = 'image/';
+
+function switchTab(prefix) {
+  currentPrefix = prefix;
+  document.querySelectorAll('.tabs button').forEach(b =>
+    b.classList.toggle('active', b.textContent.trim() === prefix));
+  loadFiles();
+}
+
+let statusTimer = null;
+function showStatus(msg, ok, duration) {
+  const el = document.getElementById('status');
+  el.className = 'status ' + (ok ? 'ok' : 'err');
+  el.textContent = msg;
+  if (statusTimer) clearTimeout(statusTimer);
+  statusTimer = setTimeout(() => { el.textContent = ''; el.className = 'status'; }, duration || 5000);
+}
+
+async function loadFiles() {
+  const container = document.getElementById('fileListContainer');
+  container.innerHTML = '<div class="loading">Loading&hellip;</div>';
+
+  try {
+    let allFiles = [];
+    let cursor = null;
+    do {
+      const params = new URLSearchParams({ prefix: currentPrefix });
+      if (cursor) params.set('cursor', cursor);
+      const res = await fetch(WORKER + '/api/list?' + params);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      allFiles = allFiles.concat(data.files);
+      cursor = data.truncated ? data.cursor : null;
+    } while (cursor);
+
+    if (allFiles.length === 0) {
+      container.innerHTML = '<div class="empty">No files in ' + currentPrefix + '</div>';
+      return;
+    }
+
+    let html = '<div class="file-list">';
+    for (const f of allFiles) {
+      const name = f.key.slice(currentPrefix.length);
+      const size = formatSize(f.size);
+      const date = new Date(f.uploaded).toLocaleDateString();
+      html += '<div class="file-row">'
+        + '<span class="name" onclick="previewFile(\'' + escAttr(f.key) + '\')" title="' + escHtml(f.key) + '">' + escHtml(name) + '</span>'
+        + '<span class="meta"><span class="size">' + size + '</span>'
+        + '<span class="date">' + date + '</span></span>'
+        + '<span class="actions">'
+        + '  <a class="btn" href="' + WORKER + '/' + encodeURI(f.key) + '" download title="Download">&#8595;</a>'
+        + '  <button class="btn" onclick="copyUrl(\'' + escAttr(f.key) + '\')" title="Copy URL">⿻</button>'
+        + '</span></div>';
+    }
+    html += '</div>';
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = '<div class="empty">Error loading files</div>';
+  }
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function escAttr(s) { return s.replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+
+function copyUrl(key) {
+  const url = WORKER + '/' + key;
+  navigator.clipboard.writeText(url).then(
+    () => showStatus('Copied: ' + url, true),
+    () => showStatus('Failed to copy URL', false)
+  );
+}
+
+function previewFile(key) {
+  const url = WORKER + '/' + key;
+  const isVideo = /\.(mp4|mov|webm|mkv)$/i.test(key);
+  const overlay = document.createElement('div');
+  overlay.className = 'preview-overlay';
+  overlay.onclick = function(e) { if (e.target === overlay) closeOverlay(); };
+  function closeOverlay() { if (overlay.parentNode) document.body.removeChild(overlay); document.removeEventListener('keydown', onKey); }
+  function onKey(e) { if (e.key === 'Escape') closeOverlay(); }
+  document.addEventListener('keydown', onKey);
+  const close = document.createElement('button');
+  close.className = 'close-btn';
+  close.innerHTML = '&times;';
+  close.onclick = closeOverlay;
+  overlay.appendChild(close);
+  if (isVideo) {
+    const vid = document.createElement('video');
+    vid.controls = true; vid.autoplay = true; vid.playsInline = true; vid.muted = true;
+    vid.onerror = function() {
+      if (overlay.parentNode) {
+        vid.remove();
+        const msg = document.createElement('div');
+        msg.style.cssText = 'text-align:center;color:var(--text);padding:32px;';
+        msg.innerHTML = '<p style="margin-bottom:12px;color:var(--text-dim);">This browser cannot play this video format.</p>'
+          + '<a class="btn" href="' + url + '" download style="font-size:0.85rem;padding:8px 18px;">Download to view</a>';
+        overlay.appendChild(msg);
+      }
+    };
+    vid.src = url;
+    overlay.appendChild(vid);
+  } else {
+    const img = document.createElement('img');
+    img.src = url; img.alt = key;
+    overlay.appendChild(img);
+  }
+  document.body.appendChild(overlay);
+}
+
+loadFiles();
+</script>
+</body>
+</html>

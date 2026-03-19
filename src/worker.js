@@ -597,8 +597,12 @@ const MANAGE_HTML = `<!DOCTYPE html>
 
 <div class="upload-zone" id="dropzone">
   <p><strong>Drop files here</strong> or click to browse</p>
+  <div style="margin-top:8px;font-size:0.9rem;color:var(--text-dim);line-height:1.5">
+    Videos &rarr; <code>video/</code> (H.264 transcode)<br>
+    Images &rarr; <code>image/</code> (AVIF optimize)
+  </div>
   <input type="checkbox" id="compressToggle" hidden>
-  <div id="compressArea" style="display:inline-block;opacity:0.3;cursor:pointer;user-select:none" onclick="(function(ev){
+  <div id="compressArea" class="quality-row" style="display:inline-flex;opacity:0.3;cursor:pointer;user-select:none" onclick="(function(ev){
     ev.stopPropagation();
     var cb=document.getElementById('compressToggle');
     cb.checked=!cb.checked;
@@ -606,15 +610,9 @@ const MANAGE_HTML = `<!DOCTYPE html>
     document.getElementById('compressArea').style.opacity=on?'1':'0.3';
     document.getElementById('qualitySlider').disabled=!on;
   })(event)">
-    <div class="quality-row">
-      <span style="color:var(--text-dim);white-space:nowrap">Compression</span>
-      <input type="range" id="qualitySlider" min="18" max="30" value="24" disabled onclick="event.stopPropagation()" oninput="document.getElementById('qualityValue').textContent=this.value">
-      <span id="qualityValue" style="color:var(--text-dim);min-width:1.4em;text-align:right">24</span>
-    </div>
-    <div style="margin-top:8px;font-size:0.9rem;color:var(--text-dim);line-height:1.5">
-      Videos &rarr; <code>video/</code> (H.264 transcode)<br>
-      Images &rarr; <code>image/</code> (AVIF optimize)
-    </div>
+    <span style="color:var(--text-dim);white-space:nowrap">Compression</span>
+    <input type="range" id="qualitySlider" min="18" max="30" value="24" disabled onclick="event.stopPropagation()" oninput="document.getElementById('qualityValue').textContent=this.value">
+    <span id="qualityValue" style="color:var(--text-dim);min-width:1.4em;text-align:right">24</span>
   </div>
   <input type="file" id="fileInput" multiple hidden>
 </div>

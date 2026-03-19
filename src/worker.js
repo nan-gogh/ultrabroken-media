@@ -601,7 +601,7 @@ const MANAGE_HTML = `<!DOCTYPE html>
   <div style="font-size:0.9rem;color:var(--text-dim);line-height:2">
     <div>Images &rarr; <code>image/</code> &nbsp;AVIF optimize</div>
     <hr style="border:none;border-top:1px solid var(--border);margin:8px 0">
-    <div>Videos &rarr; <code>video/</code></div>
+    <div>Videos &rarr; <code>video/</code> </div>
     <div class="quality-row" style="margin-top:0">
       <input type="checkbox" id="compressToggle" hidden>
       <span id="compLabel" style="opacity:0.3;cursor:pointer;user-select:none;white-space:nowrap" onclick="(function(ev){ev.stopPropagation();var cb=document.getElementById('compressToggle');cb.checked=!cb.checked;var on=cb.checked;document.getElementById('compLabel').style.opacity=on?'1':'0.3';document.getElementById('qualitySlider').disabled=!on;document.getElementById('qualitySlider').style.opacity=on?'1':'0.3';document.getElementById('qualityValue').style.opacity=on?'1':'0.3'})(event)">H.264 transcode</span>

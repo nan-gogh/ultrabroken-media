@@ -144,7 +144,7 @@ export class LocalBackend {
     const args = buildFFmpegArgs(job, {
       preset: 'medium',
       fontFile: hasOverlays ? 'font.ttf' : undefined,
-      boxBorderW: 6,
+      boxBorderW: 7,
     });
     this.onLog?.('[job] ' + args.trimCommands.length + ' clip(s) • ffmpeg ' + args.finalCommand.join(' '));
     const totalSteps  = args.trimCommands.length + 1;

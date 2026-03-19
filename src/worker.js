@@ -603,6 +603,19 @@ const MANAGE_HTML = `<!DOCTYPE html>
     <input type="range" id="qualitySlider" min="18" max="30" value="24" oninput="document.getElementById('qualityValue').textContent=this.value">
     <span id="qualityValue" style="color:var(--text-dim);font-size:0.68rem;min-width:1.4em;text-align:right">24</span>
   </div>
+  <div class="quality-row" style="margin-top:4px" onclick="event.stopPropagation()">
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+      <input type="checkbox" id="skipCompress" onchange="(function(){
+        var s=document.getElementById('qualitySlider');
+        var v=document.getElementById('qualityValue');
+        var skip=document.getElementById('skipCompress').checked;
+        s.disabled=skip;
+        s.style.opacity=skip?'0.3':'1';
+        v.style.opacity=skip?'0.3':'1';
+      })()">
+      Skip — upload as-is (already compressed)
+    </label>
+  </div>
   <input type="file" id="fileInput" multiple hidden>
 </div>
 
@@ -730,12 +743,14 @@ async function uploadFiles(rawFiles) {
   const images = files.filter(f => f.type.startsWith('image/'));
   const uploads = [];
 
+  const skipCompress = document.getElementById("skipCompress").checked;
   const quality = document.getElementById("qualitySlider").value;
 
   if (videos.length) {
     const form = new FormData();
     form.set("prefix", "video/");
     form.set("quality", quality);
+    if (skipCompress) form.set("skipWorkflow", "true");
     for (const f of videos) form.append("file", f);
     uploads.push(fetch(API + "/upload", { method: "POST", body: form }).then(r => r.json()));
   }

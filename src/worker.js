@@ -599,22 +599,21 @@ const MANAGE_HTML = `<!DOCTYPE html>
   <p><strong>Drop files here</strong> or click to browse</p>
   <p style="margin-top:6px;font-size:0.78rem;color:var(--text-dim);">Videos &rarr; <code>video/</code> (H.264 transcode) &nbsp;&bull;&nbsp; Images &rarr; <code>image/</code> (AVIF optimize)</p>
   <div class="quality-row" onclick="event.stopPropagation()">
-    <label id="compLabel">Compression</label>
-    <input type="range" id="qualitySlider" min="18" max="30" value="24" oninput="document.getElementById('qualityValue').textContent=this.value">
-    <span id="qualityValue" style="color:var(--text-dim);font-size:0.68rem;min-width:1.4em;text-align:right">24</span>
-    <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:0.72rem;color:var(--text-dim);white-space:nowrap">
-      <input type="checkbox" id="skipCompress" onchange="(function(){
+    <label style="display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap">
+      <input type="checkbox" id="compressToggle" onchange="(function(){
         var s=document.getElementById('qualitySlider');
         var v=document.getElementById('qualityValue');
         var l=document.getElementById('compLabel');
-        var skip=document.getElementById('skipCompress').checked;
-        s.disabled=skip;
-        s.style.opacity=skip?'0.3':'1';
-        v.style.opacity=skip?'0.3':'1';
-        l.style.opacity=skip?'0.3':'1';
+        var on=document.getElementById('compressToggle').checked;
+        s.disabled=!on;
+        s.style.opacity=on?'1':'0.3';
+        v.style.opacity=on?'1':'0.3';
+        l.style.opacity=on?'1':'0.3';
       })()">
-      Skip
+      <span id="compLabel" style="opacity:0.3">Compression</span>
     </label>
+    <input type="range" id="qualitySlider" min="18" max="30" value="24" disabled style="opacity:0.3" oninput="document.getElementById('qualityValue').textContent=this.value">
+    <span id="qualityValue" style="color:var(--text-dim);font-size:0.68rem;min-width:1.4em;text-align:right;opacity:0.3">24</span>
   </div>
   <input type="file" id="fileInput" multiple hidden>
 </div>
@@ -743,7 +742,7 @@ async function uploadFiles(rawFiles) {
   const images = files.filter(f => f.type.startsWith('image/'));
   const uploads = [];
 
-  const skipCompress = document.getElementById("skipCompress").checked;
+  const skipCompress = !document.getElementById("compressToggle").checked;
   const quality = document.getElementById("qualitySlider").value;
 
   if (videos.length) {

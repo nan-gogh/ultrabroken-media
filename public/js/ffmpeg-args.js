@@ -97,11 +97,12 @@ export function buildFFmpegArgs(job, opts = {}) {
     if (valid.length) {
       // fontsize=h/20 for version-consistent sizing.  All other values fixed
       // pixels — both pipelines scale to 720p so this is safe.
-      // lineStep (50px) < box height (~58px) so backdrops always overlap.
+      // lineStep (42px) with boxBorderW (10px) guarantees backdrops overlap
+      // even if text height varies across FFmpeg/FreeType versions.
       const fontSizeExpr = 'h/20';
-      const boxBorderW   = 8;
+      const boxBorderW   = 10;
       const marginB      = 32;
-      const lineStep     = 50;
+      const lineStep     = 42;
 
       // Collect all unique boundary times
       const times = new Set();

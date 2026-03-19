@@ -126,8 +126,8 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 .upload-zone p { color: var(--text-dim); font-size: 0.9rem; }
 .upload-zone p strong { color: var(--accent); }
 .quality-row {
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  margin-top: 12px; font-size: 0.78rem; color: var(--text-dim);
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  margin-top: 12px; font-size: 0.9rem; color: var(--text-dim);
 }
 .quality-row label { font-weight: 600; color: var(--text); }
 .quality-row input[type="range"] {

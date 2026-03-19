@@ -597,7 +597,6 @@ const MANAGE_HTML = `<!DOCTYPE html>
 
 <div class="upload-zone" id="dropzone">
   <p><strong>Drop files here</strong> or click to browse</p>
-  <p style="margin-top:6px;font-size:0.78rem;color:var(--text-dim);">Videos &rarr; <code>video/</code> (H.264 transcode) &nbsp;&bull;&nbsp; Images &rarr; <code>image/</code> (AVIF optimize)</p>
   <div class="quality-row" onclick="event.stopPropagation()">
     <input type="checkbox" id="compressToggle" hidden>
     <span id="compLabel" style="color:var(--text-dim);opacity:0.3;cursor:pointer;white-space:nowrap;user-select:none" onclick="(function(){
@@ -613,7 +612,11 @@ const MANAGE_HTML = `<!DOCTYPE html>
       l.style.opacity=on?'1':'0.3';
     })()">Compression</span>
     <input type="range" id="qualitySlider" min="18" max="30" value="24" disabled style="opacity:0.3" oninput="document.getElementById('qualityValue').textContent=this.value">
-    <span id="qualityValue" style="color:var(--text-dim);font-size:0.68rem;min-width:1.4em;text-align:right;opacity:0.3">24</span>
+    <span id="qualityValue" style="color:var(--text-dim);min-width:1.4em;text-align:right;opacity:0.3">24</span>
+  </div>
+  <div style="margin-top:8px;color:var(--text-dim);line-height:1.5">
+    Videos &rarr; <code>video/</code> (H.264 transcode)<br>
+    Images &rarr; <code>image/</code> (AVIF optimize)
   </div>
   <input type="file" id="fileInput" multiple hidden>
 </div>

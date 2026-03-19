@@ -597,22 +597,20 @@ const MANAGE_HTML = `<!DOCTYPE html>
 
 <div class="upload-zone" id="dropzone">
   <p><strong>Drop files here</strong> or click to browse</p>
-  <div style="margin-top:8px;font-size:0.9rem;color:var(--text-dim);line-height:1.5">
-    Videos &rarr; <code>video/</code> (H.264 transcode)<br>
-    Images &rarr; <code>image/</code> (AVIF optimize)
-  </div>
-  <input type="checkbox" id="compressToggle" hidden>
-  <div id="compressArea" class="quality-row" style="display:inline-flex;opacity:0.3;cursor:pointer;user-select:none" onclick="(function(ev){
-    ev.stopPropagation();
-    var cb=document.getElementById('compressToggle');
-    cb.checked=!cb.checked;
-    var on=cb.checked;
-    document.getElementById('compressArea').style.opacity=on?'1':'0.3';
-    document.getElementById('qualitySlider').disabled=!on;
-  })(event)">
-    <span style="color:var(--text-dim);white-space:nowrap">Compression</span>
-    <input type="range" id="qualitySlider" min="18" max="30" value="24" disabled onclick="event.stopPropagation()" oninput="document.getElementById('qualityValue').textContent=this.value">
-    <span id="qualityValue" style="color:var(--text-dim);min-width:1.4em;text-align:right">24</span>
+  <div style="margin-top:10px;font-size:0.9rem;color:var(--text-dim);line-height:2">
+    <div style="display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap">
+      <span>Images &rarr; <code>image/</code></span>
+      <span style="color:var(--text-dim)">AVIF optimize</span>
+    </div>
+    <div style="margin-top:8px;display:flex;align-items:center;justify-content:center;gap:8px">
+      <span>Videos &rarr; <code>video/</code></span>
+      <input type="checkbox" id="compressToggle" hidden>
+      <span id="h264Toggle" style="display:inline-flex;align-items:center;gap:8px;opacity:0.3;cursor:pointer;user-select:none" onclick="(function(ev){ev.stopPropagation();var cb=document.getElementById('compressToggle');cb.checked=!cb.checked;var on=cb.checked;document.getElementById('h264Toggle').style.opacity=on?'1':'0.3';document.getElementById('qualitySlider').disabled=!on;})();">
+        <span style="white-space:nowrap">H.264 transcode</span>
+        <input type="range" id="qualitySlider" min="18" max="30" value="24" disabled onclick="event.stopPropagation()" oninput="document.getElementById('qualityValue').textContent=this.value" style="width:100px;margin:0">
+        <span id="qualityValue" style="min-width:1.4em;text-align:right">24</span>
+      </span>
+    </div>
   </div>
   <input type="file" id="fileInput" multiple hidden>
 </div>

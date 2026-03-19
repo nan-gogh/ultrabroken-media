@@ -599,8 +599,8 @@ const MANAGE_HTML = `<!DOCTYPE html>
   <p><strong>Drop files here</strong> or click to browse</p>
   <div style="margin-top:10px;font-size:0.9rem;color:var(--text-dim);line-height:2">
     <div>Images &rarr; <code>image/</code> &nbsp;AVIF optimize</div>
+    <div>Videos &rarr; <code>video/</code></div>
     <div class="quality-row" style="margin-top:0">
-      <span>Videos &rarr; <code>video/</code></span>
       <input type="checkbox" id="compressToggle" hidden>
       <span id="compLabel" style="opacity:0.3;cursor:pointer;user-select:none" onclick="(function(ev){ev.stopPropagation();var cb=document.getElementById('compressToggle');cb.checked=!cb.checked;var on=cb.checked;document.getElementById('compLabel').style.opacity=on?'1':'0.3';document.getElementById('qualitySlider').disabled=!on;document.getElementById('qualitySlider').style.opacity=on?'1':'0.3';document.getElementById('qualityValue').style.opacity=on?'1':'0.3'})(event)">H.264 transcode</span>
       <input type="range" id="qualitySlider" min="18" max="30" value="24" disabled onclick="event.stopPropagation()" oninput="document.getElementById('qualityValue').textContent=this.value" style="opacity:0.3">

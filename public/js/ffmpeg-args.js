@@ -97,9 +97,10 @@ export function buildFFmpegArgs(job, opts = {}) {
     if (valid.length) {
       // fontsize=h/20 for version-consistent sizing.  Bottom line's backdrop
       // is flush with the frame bottom edge.  Lines stack upward using th.
-      // boxborderw=8 ensures backdrops overlap between lines.
+      // boxborderw=5 keeps padding tight so minor FreeType differences
+      // between FFmpeg versions are less visible.
       const fontSizeExpr = 'h/20';
-      const boxBorderW   = 8;
+      const boxBorderW   = 5;
 
       // Collect all unique boundary times
       const times = new Set();

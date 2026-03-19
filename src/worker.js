@@ -599,21 +599,21 @@ const MANAGE_HTML = `<!DOCTYPE html>
   <p><strong>Drop files here</strong> or click to browse</p>
   <p style="margin-top:6px;font-size:0.78rem;color:var(--text-dim);">Videos &rarr; <code>video/</code> (H.264 transcode) &nbsp;&bull;&nbsp; Images &rarr; <code>image/</code> (AVIF optimize)</p>
   <div class="quality-row" onclick="event.stopPropagation()">
-    <label>Compression</label>
+    <label id="compLabel">Compression</label>
     <input type="range" id="qualitySlider" min="18" max="30" value="24" oninput="document.getElementById('qualityValue').textContent=this.value">
     <span id="qualityValue" style="color:var(--text-dim);font-size:0.68rem;min-width:1.4em;text-align:right">24</span>
-  </div>
-  <div class="quality-row" style="margin-top:4px" onclick="event.stopPropagation()">
-    <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+    <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:0.72rem;color:var(--text-dim);white-space:nowrap">
       <input type="checkbox" id="skipCompress" onchange="(function(){
         var s=document.getElementById('qualitySlider');
         var v=document.getElementById('qualityValue');
+        var l=document.getElementById('compLabel');
         var skip=document.getElementById('skipCompress').checked;
         s.disabled=skip;
         s.style.opacity=skip?'0.3':'1';
         v.style.opacity=skip?'0.3':'1';
+        l.style.opacity=skip?'0.3':'1';
       })()">
-      Skip — upload as-is (already compressed)
+      Skip
     </label>
   </div>
   <input type="file" id="fileInput" multiple hidden>

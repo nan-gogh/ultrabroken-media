@@ -50,6 +50,9 @@
  *   remote).  Used in drawtext's fontfile= option.  FFmpeg.wasm has no
  *   system fonts, so this is required for overlay text.
  *   Example: `'font.ttf'` (written to the VFS root before encode).
+ * @property {number} [boxBorderW]
+ *   Override the drawtext box border width (pixels).  Defaults to 5.
+ *   Local mode passes 6 to compensate for FFmpeg.wasm FreeType metrics.
  */
 
 /**
@@ -97,10 +100,10 @@ export function buildFFmpegArgs(job, opts = {}) {
     if (valid.length) {
       // fontsize=h/20 for version-consistent sizing.  Bottom line's backdrop
       // is flush with the frame bottom edge.  Lines stack upward using th.
-      // boxborderw=5 keeps padding tight so minor FreeType differences
-      // between FFmpeg versions are less visible.
+      // boxBorderW defaults to 5; local passes 6 to compensate for
+      // FFmpeg.wasm FreeType rendering slightly larger text metrics.
       const fontSizeExpr = 'h/20';
-      const boxBorderW   = 5;
+      const boxBorderW   = opts.boxBorderW ?? 5;
 
       // Collect all unique boundary times
       const times = new Set();

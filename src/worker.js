@@ -584,6 +584,15 @@ const MANAGE_HTML = `<!DOCTYPE html>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=New+Rocker&family=Texturina:ital,opsz,wght@0,12..44,100..900;1,12..44,100..900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/manage/css/vault.css">
+<style>
+#compressToggle:checked::after {
+  content: '';
+  position: absolute; left: 2px; top: 0px;
+  width: 5px; height: 9px;
+  border: solid var(--bg); border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+</style>
 </head>
 <body>
 
@@ -599,16 +608,23 @@ const MANAGE_HTML = `<!DOCTYPE html>
   <p><strong>Drop files here</strong> or click to browse</p>
   <p style="margin-top:6px;font-size:0.78rem;color:var(--text-dim);">Videos &rarr; <code>video/</code> (H.264 transcode) &nbsp;&bull;&nbsp; Images &rarr; <code>image/</code> (AVIF optimize)</p>
   <div class="quality-row" onclick="event.stopPropagation()">
-    <label style="display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap">
-      <input type="checkbox" id="compressToggle" onchange="(function(){
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap">
+      <input type="checkbox" id="compressToggle" style="
+        -webkit-appearance:none;appearance:none;width:14px;height:14px;
+        border:1.5px solid var(--border);border-radius:3px;background:transparent;
+        cursor:pointer;position:relative;flex-shrink:0;vertical-align:middle;
+      " onchange="(function(){
         var s=document.getElementById('qualitySlider');
         var v=document.getElementById('qualityValue');
         var l=document.getElementById('compLabel');
-        var on=document.getElementById('compressToggle').checked;
+        var cb=document.getElementById('compressToggle');
+        var on=cb.checked;
         s.disabled=!on;
         s.style.opacity=on?'1':'0.3';
         v.style.opacity=on?'1':'0.3';
         l.style.opacity=on?'1':'0.3';
+        cb.style.borderColor=on?'var(--accent)':'var(--border)';
+        cb.style.background=on?'var(--accent)':'transparent';
       })()">
       <span id="compLabel" style="opacity:0.3">Compression</span>
     </label>

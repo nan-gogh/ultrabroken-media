@@ -587,9 +587,9 @@ const MANAGE_HTML = `<!DOCTYPE html>
 <style>
 #compressToggle:checked::after {
   content: '';
-  position: absolute; left: 2px; top: 0px;
-  width: 5px; height: 9px;
-  border: solid var(--bg); border-width: 0 2px 2px 0;
+  position: absolute; left: 2.5px; top: 1px;
+  width: 4px; height: 7px;
+  border: solid var(--bg); border-width: 0 1.5px 1.5px 0;
   transform: rotate(45deg);
 }
 </style>

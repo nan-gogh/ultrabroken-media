@@ -614,7 +614,7 @@ const MANAGE_HTML = `<!DOCTYPE html>
     <input type="range" id="qualitySlider" min="18" max="30" value="24" disabled style="opacity:0.3" oninput="document.getElementById('qualityValue').textContent=this.value">
     <span id="qualityValue" style="color:var(--text-dim);min-width:1.4em;text-align:right;opacity:0.3">24</span>
   </div>
-  <div style="margin-top:8px;color:var(--text-dim);line-height:1.5">
+  <div style="margin-top:8px;font-size:0.9rem;color:var(--text-dim);line-height:1.5">
     Videos &rarr; <code>video/</code> (H.264 transcode)<br>
     Images &rarr; <code>image/</code> (AVIF optimize)
   </div>

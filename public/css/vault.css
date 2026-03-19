@@ -133,6 +133,7 @@ button.btn.danger:hover { color: var(--danger); border-color: var(--danger); }
 .quality-row input[type="range"] {
   -webkit-appearance: none; appearance: none; width: 120px; height: 14px;
   background: var(--border); border-radius: 7px; outline: none; cursor: pointer;
+  margin: 0;
 }
 .quality-row input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
